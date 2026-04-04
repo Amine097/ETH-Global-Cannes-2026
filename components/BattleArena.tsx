@@ -21,7 +21,7 @@ const RANK_COLORS: Record<string, string> = {
   diamond: "text-[#b57dee]",
 };
 
-type Phase = "countdown" | "resolving" | "result";
+type Phase = "deposit" | "waiting-deposits" | "countdown" | "resolving" | "result";
 
 interface Props {
   battleId: string;
@@ -33,6 +33,9 @@ interface Props {
 export const BattleArena = ({ battleId, playerPk, role, onDone }: Props) => {
   const [phase, setPhase] = useState<Phase>("countdown");
   const [countdown, setCountdown] = useState(5);
+  const [depositStatus, setDepositStatus] = useState<string | null>(null);
+  const [escrowAddress, setEscrowAddress] = useState<string | null>(null);
+  const depositPollingRef = useRef(false);
   const [battle, setBattle] = useState<Battle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const resolved = useRef(false);
@@ -44,6 +47,81 @@ export const BattleArena = ({ battleId, playerPk, role, onDone }: Props) => {
     return () => clearTimeout(t);
   }, [phase, countdown]);
 
+  // ── Send deposit using connected wallet (via window.ethereum) ──
+  async function sendDeposit() {
+    if (!battle?.wagerAmount || !escrowAddress) return;
+    setDepositStatus("Sending deposit...");
+    try {
+      // Use window.ethereum (injected by Dynamic SDK / MetaMask)
+      const ethereum = (window as unknown as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
+      if (!ethereum) {
+        setDepositStatus("No wallet found. Please connect via Dynamic.");
+        return;
+      }
+      const accounts = (await ethereum.request({ method: "eth_requestAccounts" })) as string[];
+      if (!accounts?.[0]) { setDepositStatus("No account found"); return; }
+
+      // Convert ETH to wei hex
+      const weiAmount = BigInt(Math.floor(parseFloat(battle.wagerAmount) * 1e18));
+      const hexValue = "0x" + weiAmount.toString(16);
+
+      // Send transaction
+      const txHash = await ethereum.request({
+        method: "eth_sendTransaction",
+        params: [{
+          from: accounts[0],
+          to: escrowAddress,
+          value: hexValue,
+        }],
+      });
+
+      setDepositStatus("Deposit sent! Waiting for opponent...");
+
+      // Confirm deposit with server
+      await fetch("/api/escrow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "confirm-deposit",
+          battleId,
+          playerPk: playerPk,
+          txHash,
+        }),
+      });
+
+      // Start polling for both deposits
+      setPhase("waiting-deposits");
+      pollDeposits();
+    } catch (err: unknown) {
+      setDepositStatus(err instanceof Error ? err.message : "Deposit failed");
+    }
+  }
+
+  function pollDeposits() {
+    depositPollingRef.current = true;
+    const interval = setInterval(async () => {
+      if (!depositPollingRef.current) { clearInterval(interval); return; }
+      try {
+        const res = await fetch("/api/escrow", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "check-deposits", battleId }),
+        });
+        const data = await res.json();
+        if (data.bothDeposited) {
+          depositPollingRef.current = false;
+          clearInterval(interval);
+          setPhase("countdown");
+        }
+      } catch { /* retry */ }
+    }, 2000);
+  }
+
+  // Cleanup deposit polling
+  useEffect(() => {
+    return () => { depositPollingRef.current = false; };
+  }, []);
+
   const resolve = useCallback(async () => {
     if (resolved.current) return;
     resolved.current = true;
@@ -54,7 +132,20 @@ export const BattleArena = ({ battleId, playerPk, role, onDone }: Props) => {
         body: JSON.stringify({ action: "resolve", battleId }),
       });
       const data = await res.json();
-      if (data.battle) { setBattle(data.battle); setPhase("result"); }
+      if (data.battle) {
+        setBattle(data.battle);
+        // Trigger payout for wager battles
+        if (data.battle.mode === "wager") {
+          fetch("/api/escrow", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "payout", battleId }),
+          }).then(r => r.json()).then(d => {
+            if (d.txHash && data.battle) data.battle.payoutTx = d.txHash;
+          }).catch(() => {});
+        }
+        setPhase("result");
+      }
       else setError(data.error ?? "Failed to resolve");
     } else {
       const poll = async () => {
@@ -82,14 +173,31 @@ export const BattleArena = ({ battleId, playerPk, role, onDone }: Props) => {
     if (phase === "resolving") resolve();
   }, [phase, resolve]);
 
+  // Fetch battle info + determine if deposit phase is needed
   useEffect(() => {
-    fetch("/api/battle", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "poll-status", battleId }),
-    })
-      .then((r) => r.json())
-      .then((d) => { if (d.battle) setBattle(d.battle); });
+    (async () => {
+      const res = await fetch("/api/battle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "poll-status", battleId }),
+      });
+      const d = await res.json();
+      if (d.battle) {
+        setBattle(d.battle);
+        // If wager battle, start deposit phase
+        if (d.battle.mode === "wager" && d.battle.wagerAmount) {
+          // Get escrow address
+          const escRes = await fetch("/api/escrow", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "get-address" }),
+          });
+          const escData = await escRes.json();
+          setEscrowAddress(escData.escrowAddress);
+          setPhase("deposit");
+        }
+      }
+    })();
   }, [battleId]);
 
   const me = battle ? (role === "attacker" ? battle.attacker : battle.defender) : null;
@@ -98,6 +206,75 @@ export const BattleArena = ({ battleId, playerPk, role, onDone }: Props) => {
   const myXpDelta = battle ? (role === "attacker" ? battle.attackerXpDelta : battle.defenderXpDelta) : 0;
   const myNewLevel = battle ? (role === "attacker" ? battle.attackerNewLevel : battle.defenderNewLevel) : undefined;
   const myNewRank = battle ? (role === "attacker" ? battle.attackerNewRank : battle.defenderNewRank) : undefined;
+
+  // ── Deposit phase (wager battles) ──
+  if (phase === "deposit" && battle?.mode === "wager") {
+    return (
+      <div className="realm-bg flex min-h-screen flex-col items-center justify-center px-6">
+        <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_50%_20%,rgba(201,162,39,0.08),transparent_65%)]" />
+        <div className="relative w-full max-w-sm text-center">
+          <div className="mb-4 text-5xl">💰</div>
+          <h2 className="font-cinzel text-xl font-bold tracking-wider text-[#f0e6c8]">
+            Deposit Your Wager
+          </h2>
+          <p className="mt-2 font-crimson text-sm text-[#7a6845]">
+            Send <span className="font-semibold text-[#c9a227]">{battle.wagerAmount} ETH</span> to the escrow
+          </p>
+
+          {escrowAddress && (
+            <div className="mt-4 rounded-lg border border-[#2e2010] bg-[#0d0b06] px-3 py-2">
+              <p className="font-cinzel text-[10px] tracking-wider text-[#5a4010] uppercase">Escrow Address (Sepolia)</p>
+              <p className="mt-1 font-mono text-[10px] text-[#c9a227] break-all">{escrowAddress}</p>
+            </div>
+          )}
+
+          <button
+            onClick={sendDeposit}
+            className="btn-gold mt-6 w-full rounded-lg px-8 py-4 text-base"
+          >
+            Send {battle.wagerAmount} ETH
+          </button>
+
+          {depositStatus && (
+            <p className="mt-3 font-crimson text-xs text-[#7a6845]">{depositStatus}</p>
+          )}
+
+          <p className="mt-4 font-crimson text-[10px] text-[#3d2a10]">
+            Powered by <span className="text-[#5a4010]">Dynamic</span> · Sepolia Testnet
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Waiting for both deposits ──
+  if (phase === "waiting-deposits") {
+    return (
+      <div className="realm-bg flex min-h-screen flex-col items-center justify-center px-6">
+        <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_50%_20%,rgba(201,162,39,0.06),transparent_65%)]" />
+        <div className="relative w-full max-w-sm text-center">
+          <div className="mx-auto mb-4 h-10 w-10 spinner-gold" />
+          <h2 className="font-cinzel text-lg font-bold tracking-wider text-[#f0e6c8]">
+            Wager Deposited
+          </h2>
+          <p className="mt-2 font-crimson text-sm text-[#7a6845]">
+            Waiting for opponent to deposit their wager...
+          </p>
+          <div className="mt-6 medieval-card p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-cinzel text-xs text-[#5a4010]">You</span>
+              <span className="font-cinzel text-xs font-bold text-[#c9a227]">Deposited ✓</span>
+            </div>
+            <div className="h-px bg-[#1e1608]" />
+            <div className="flex items-center justify-between mt-2">
+              <span className="font-cinzel text-xs text-[#5a4010]">Opponent</span>
+              <span className="font-cinzel text-xs text-[#7a6845] animate-pulse">Pending...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── Countdown ──
   if (phase === "countdown") {
@@ -303,7 +480,19 @@ export const BattleArena = ({ battleId, playerPk, role, onDone }: Props) => {
                style={{ textShadow: iWon ? "0 0 20px rgba(201,162,39,0.4)" : "none" }}>
               {iWon ? "+" : "-"}{battle.wagerAmount} ETH
             </p>
-            <p className="mt-1 font-crimson text-[10px] text-[#5a4010]">Settled via Dynamic escrow</p>
+            <p className="mt-1 font-crimson text-[10px] text-[#5a4010]">
+              Settled via Dynamic escrow · Sepolia
+            </p>
+            {battle.payoutTx && (
+              <a
+                href={`https://sepolia.etherscan.io/tx/${battle.payoutTx}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-block font-mono text-[9px] text-[#c9a227] underline"
+              >
+                View on Etherscan →
+              </a>
+            )}
           </div>
         )}
 
