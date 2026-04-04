@@ -18,7 +18,7 @@ const sendPayment = async () => {
 
     const payload: PayCommandInput = {
       reference: id,
-      to: "0x0c892815f0B058E69987920A23FBb33c834289cf", // Test address
+      to: "0x0c892815f0B058E69987920A23FBb33c834289cf",
       tokens: [
         {
           symbol: Tokens.WLD,
@@ -53,17 +53,15 @@ const handlePay = async () => {
   }
 
   if (response.status == "success") {
-    const res = await fetch(`${process.env.NEXTAUTH_URL}/api/confirm-payment`, {
+    const res = await fetch(`/api/confirm-payment`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ payload: response }),
     });
     const payment = await res.json();
     if (payment.success) {
-      // Congrats your payment was successful!
       console.log("SUCCESS!");
     } else {
-      // Payment failed
       console.log("FAILED!");
     }
   }
