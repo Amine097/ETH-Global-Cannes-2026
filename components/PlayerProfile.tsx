@@ -95,7 +95,7 @@ export const PlayerProfile = ({ etherAddress, publicKey, username, walletAddress
       QRCode.toCanvas(canvasRef.current, publicKey, {
         width: 160,
         margin: 2,
-        color: { dark: "#c9a227", light: "#00000000" },
+        color: { dark: "#0a0806", light: "#f5e6c0" },
       });
     }
   }, [publicKey]);

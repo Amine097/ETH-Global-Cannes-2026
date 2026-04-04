@@ -39,6 +39,9 @@ export const BattleScanner = ({ playerPk, hasWallet, onConnectWallet, onBack }: 
   const streamRef = useRef<MediaStream | null>(null);
   const scanningRef = useRef(false);
   const pollingRef = useRef(false);
+  // Pre-load jsqr once so it's ready synchronously during scan frames
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const jsQrRef = useRef<((data: Uint8ClampedArray, width: number, height: number) => { data: string } | null) | null>(null);
 
   function stopCamera() {
     scanningRef.current = false;
@@ -81,25 +84,11 @@ export const BattleScanner = ({ playerPk, hasWallet, onConnectWallet, onBack }: 
     }
   }
 
-  // ── QR scan ──
-  const startQrScan = useCallback(async () => {
-    setStep("scanning-qr");
+  // ── QR scan — just flip the step; useEffect handles camera after render ──
+  function startQrScan() {
     setError(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-      scanningRef.current = true;
-      requestAnimationFrame(scanFrame);
-    } catch {
-      setError("Camera access denied");
-      setStep("error");
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    setStep("scanning-qr");
+  }
 
   const scanFrame = useCallback(() => {
     if (!scanningRef.current) return;
@@ -110,20 +99,22 @@ export const BattleScanner = ({ playerPk, hasWallet, onConnectWallet, onBack }: 
       return;
     }
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) { requestAnimationFrame(scanFrame); return; }
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    import("jsqr").then((jsQR) => {
-      const code = jsQR.default(imageData.data, imageData.width, imageData.height);
+    // jsQrRef is pre-loaded on mount — synchronous call, no async race
+    const jsQr = jsQrRef.current;
+    if (jsQr) {
+      const code = jsQr(imageData.data, imageData.width, imageData.height);
       if (code && code.data) {
         stopCamera();
         initiateBattle(code.data);
-      } else if (scanningRef.current) {
-        requestAnimationFrame(scanFrame);
+        return;
       }
-    });
+    }
+    if (scanningRef.current) requestAnimationFrame(scanFrame);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -193,12 +184,40 @@ export const BattleScanner = ({ playerPk, hasWallet, onConnectWallet, onBack }: 
     }, 2000);
   }
 
+  // Pre-load jsqr on mount
   useEffect(() => {
+    import("jsqr").then((m) => { jsQrRef.current = m.default; });
     return () => {
       stopCamera();
       pollingRef.current = false;
     };
   }, []);
+
+  // Start camera AFTER "scanning-qr" renders the <video> element into the DOM
+  useEffect(() => {
+    if (step !== "scanning-qr") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+        scanningRef.current = true;
+        requestAnimationFrame(scanFrame);
+      } catch {
+        if (!cancelled) {
+          setError("Camera access denied");
+          setStep("error");
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   // ── Arena phase ──
   if (step === "arena" && battleId) {
