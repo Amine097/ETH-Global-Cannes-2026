@@ -48,7 +48,9 @@ interface Props {
   etherAddress: string;
   publicKey: string;
   username: string;
+  walletAddress: string;
   onBattle: () => void;
+  onConnectWallet: () => void;
   onLogout: () => void;
 }
 
@@ -57,7 +59,7 @@ function xpForLevel(level: number): number {
   return level * (level - 1) * 50;
 }
 
-export const PlayerProfile = ({ etherAddress, publicKey, username, onBattle, onLogout }: Props) => {
+export const PlayerProfile = ({ etherAddress, publicKey, username, walletAddress, onBattle, onConnectWallet, onLogout }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [profile, setProfile] = useState<ProfileData>({ xp: 0, level: 1, rank: "bronze", skinIndex: 1 });
 
@@ -170,12 +172,37 @@ export const PlayerProfile = ({ etherAddress, publicKey, username, onBattle, onL
         </div>
 
         {/* Stats */}
-        <div className="medieval-card mb-5 p-4">
+        <div className="medieval-card mb-3 p-4">
           <div className="space-y-3">
             <StatRow label="Bracelet" value={etherAddress.slice(0, 8) + "…" + etherAddress.slice(-6)} mono />
             <div className="h-px bg-[#1e1608]" />
             <StatRow label="World ID" value="Verified ✓" accent />
+            <div className="h-px bg-[#1e1608]" />
+            <StatRow label="ENS" value={`${username.toLowerCase()}.raidbattle.eth`} />
           </div>
+        </div>
+
+        {/* Wallet (Dynamic) */}
+        <div className="medieval-card mb-5 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-cinzel text-xs tracking-wider text-[#5a4010] uppercase">Wallet</span>
+            <span className="font-crimson text-[10px] text-[#7a6845]">via Dynamic</span>
+          </div>
+          {walletAddress ? (
+            <div className="rounded-lg border border-[#c9a227]/20 bg-[#c9a227]/5 px-3 py-2">
+              <p className="font-mono text-xs text-[#c9a227]">
+                {walletAddress.slice(0, 8)}…{walletAddress.slice(-6)}
+              </p>
+              <p className="mt-1 font-crimson text-[10px] text-[#7a6845]">Ready for wager battles</p>
+            </div>
+          ) : (
+            <button
+              onClick={onConnectWallet}
+              className="w-full rounded-lg border border-dashed border-[#c9a227]/30 bg-[#c9a227]/5 px-4 py-3 font-cinzel text-xs tracking-wider text-[#c9a227] hover:border-[#c9a227]/60 hover:bg-[#c9a227]/10 transition-all"
+            >
+              💰 Connect Wallet for Wagers
+            </button>
+          )}
         </div>
 
         {/* Battle button */}

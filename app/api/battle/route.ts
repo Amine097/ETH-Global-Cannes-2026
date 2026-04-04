@@ -13,11 +13,11 @@ export async function POST(req: NextRequest) {
 
   // ── Initiate a battle ──
   if (action === "initiate") {
-    const { attackerPk, defenderPk } = body;
+    const { attackerPk, defenderPk, mode, wagerAmount } = body;
     if (!attackerPk || !defenderPk) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
-    const result = createBattle(attackerPk, defenderPk);
+    const result = createBattle(attackerPk, defenderPk, mode ?? "free", wagerAmount);
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }

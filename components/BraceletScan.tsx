@@ -59,8 +59,6 @@ export const BraceletScan = ({ mode, onResult, onBack }: Props) => {
     }
   }
 
-  const isLogin = mode === "login";
-
   return (
     <div className="realm-bg flex min-h-screen flex-col items-center justify-center px-6">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_50%_15%,rgba(201,162,39,0.06),transparent_65%)]" />
@@ -68,14 +66,12 @@ export const BraceletScan = ({ mode, onResult, onBack }: Props) => {
       <div className="relative w-full max-w-sm">
         {/* Header */}
         <div className="mb-8 text-center">
-          <div className="mb-4 text-4xl">{isLogin ? "🔑" : "📿"}</div>
+          <div className="mb-4 text-4xl">📿</div>
           <h1 className="font-cinzel text-2xl font-bold tracking-wider text-[#f0e6c8]">
-            {isLogin ? "Reclaim Your Seal" : "Bind Your Sigil"}
+            Scan Your Bracelet
           </h1>
           <p className="mt-2 font-crimson text-sm text-[#7a6845]">
-            {isLogin
-              ? "Touch your enchanted bracelet to enter"
-              : "Touch your bracelet to forge your identity"}
+            Touch your enchanted bracelet to enter the realm
           </p>
         </div>
 

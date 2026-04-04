@@ -5,26 +5,23 @@ import { Welcome } from "@/components/Welcome";
 import { WorldVerify } from "@/components/WorldVerify";
 import { BraceletScan } from "@/components/BraceletScan";
 import { UsernameChooser } from "@/components/UsernameChooser";
-import { NotRegistered } from "@/components/NotRegistered";
 import { PlayerProfile } from "@/components/PlayerProfile";
 import { BattleScanner } from "@/components/BattleScanner";
 import { BattleInvite } from "@/components/BattleInvite";
 import { BattleArena } from "@/components/BattleArena";
+import { WalletConnect } from "@/components/WalletConnect";
 
 type View =
   | "loading"
   | "welcome"
   | "verify"
-  | "scan-login"
-  | "scan-signup"
+  | "scan"
   | "username"
-  | "not-registered"
   | "profile"
+  | "wallet-connect"
   | "battle"
   | "battle-invite"
   | "battle-arena";
-
-type AuthMode = "login" | "signup";
 
 interface PlayerData {
   publicKey: string;
@@ -45,12 +42,14 @@ interface PendingBattle {
   attackerLevel: number;
   attackerSkin: number;
   attackerRank: string;
+  battleMode: "free" | "wager";
+  wagerAmount?: string;
 }
 
 export default function Home() {
   const [view, setView] = useState<View>("loading");
-  const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [player, setPlayer] = useState<PlayerData | null>(null);
+  const [walletAddress, setWalletAddress] = useState<string>("");
   const [scanData, setScanData] = useState<ScanData | null>(null);
   const [pendingBattle, setPendingBattle] = useState<PendingBattle | null>(null);
   const [activeBattleId, setActiveBattleId] = useState<string | null>(null);
@@ -65,22 +64,26 @@ export default function Home() {
         const p = JSON.parse(saved) as PlayerData;
         if (p.publicKey && p.username && worldVerified) {
           setPlayer(p);
+          // Fetch wallet address
+          fetch(`/api/players/check?pk=${encodeURIComponent(p.publicKey)}`)
+            .then(r => r.json())
+            .then(d => { if (d.player?.walletAddress) setWalletAddress(d.player.walletAddress); })
+            .catch(() => {});
           setView("profile");
           return;
         }
         // Player exists but not World ID verified — force re-verify
         if (p.publicKey && p.username && !worldVerified) {
           setPlayer(p);
-          setAuthMode("login");
           setView("verify");
           return;
         }
       } catch { /* ignore */ }
     }
 
-    const pendingMode = localStorage.getItem("pending_auth_mode");
-    if (pendingMode === "login" || pendingMode === "signup") {
-      setAuthMode(pendingMode);
+    // Returning from World App redirect?
+    const pending = localStorage.getItem("pending_verify");
+    if (pending === "true") {
       setView("verify");
       return;
     }
@@ -111,6 +114,8 @@ export default function Home() {
             attackerLevel: data.battle.attacker.level,
             attackerSkin: data.battle.attacker.skinIndex,
             attackerRank: data.battle.attacker.rank,
+            battleMode: data.battle.mode ?? "free",
+            wagerAmount: data.battle.wagerAmount,
           });
           setView("battle-invite");
         }
@@ -131,15 +136,14 @@ export default function Home() {
 
   // ── Auth flow ──
 
-  function startAuth(mode: AuthMode) {
-    setAuthMode(mode);
-    localStorage.setItem("pending_auth_mode", mode);
+  function startAuth() {
+    localStorage.setItem("pending_verify", "true");
     setView("verify");
   }
 
   function handleVerified() {
     localStorage.setItem("world_verified", "true");
-    localStorage.removeItem("pending_auth_mode");
+    localStorage.removeItem("pending_verify");
 
     // If player already exists (re-verify flow), go straight to profile
     if (player) {
@@ -147,36 +151,49 @@ export default function Home() {
       return;
     }
 
-    setView(authMode === "login" ? "scan-login" : "scan-signup");
+    setView("scan");
   }
 
-  async function handleLoginScan(data: ScanData) {
+  async function handleScan(data: ScanData) {
+    // Check if this bracelet is already bound to an account
     const res = await fetch(`/api/players/check?pk=${encodeURIComponent(data.publicKey)}`);
     const check = await res.json();
 
     if (check.registered && check.player.username) {
+      // Already bound → log them in directly
       const p: PlayerData = {
         publicKey: check.player.publicKey,
         etherAddress: check.player.etherAddress,
         username: check.player.username,
       };
       setPlayer(p);
+      setWalletAddress(check.player.walletAddress ?? "");
       localStorage.setItem("player", JSON.stringify(p));
       setView("profile");
+    } else if (check.registered && !check.player.username) {
+      // Registered but no username yet → go to username chooser
+      setScanData(data);
+      setView("username");
     } else {
-      setView("not-registered");
+      // New bracelet → go to username chooser
+      setScanData(data);
+      setView("username");
     }
   }
 
-  function handleSignupScan(data: ScanData) {
-    setScanData(data);
-    setView("username");
+  function handleConnectWallet() {
+    setView("wallet-connect");
+  }
+
+  function handleWalletConnected(address: string) {
+    setWalletAddress(address);
+    setView("profile");
   }
 
   function handleLogout() {
     localStorage.removeItem("player");
     localStorage.removeItem("world_verified");
-    localStorage.removeItem("pending_auth_mode");
+    localStorage.removeItem("pending_verify");
     pollingRef.current = false;
     setPlayer(null);
     setView("welcome");
@@ -218,12 +235,7 @@ export default function Home() {
   }
 
   if (view === "welcome") {
-    return (
-      <Welcome
-        onLogin={() => startAuth("login")}
-        onSignup={() => startAuth("signup")}
-      />
-    );
+    return <Welcome onEnter={() => startAuth()} />;
   }
 
   if (view === "verify") {
@@ -231,28 +243,15 @@ export default function Home() {
       <WorldVerify
         onVerified={handleVerified}
         onBack={() => {
-          localStorage.removeItem("pending_auth_mode");
+          localStorage.removeItem("pending_verify");
           setView("welcome");
         }}
       />
     );
   }
 
-  if (view === "scan-login") {
-    return <BraceletScan mode="login" onResult={handleLoginScan} onBack={() => setView("welcome")} />;
-  }
-
-  if (view === "scan-signup") {
-    return <BraceletScan mode="signup" onResult={handleSignupScan} onBack={() => setView("welcome")} />;
-  }
-
-  if (view === "not-registered") {
-    return (
-      <NotRegistered
-        onBack={() => setView("welcome")}
-        onSignup={() => setView("scan-signup")}
-      />
-    );
+  if (view === "scan") {
+    return <BraceletScan mode="signup" onResult={handleScan} onBack={() => setView("welcome")} />;
   }
 
   if (view === "username" && scanData) {
@@ -276,6 +275,16 @@ export default function Home() {
     );
   }
 
+  if (view === "wallet-connect" && player) {
+    return (
+      <WalletConnect
+        playerPk={player.publicKey}
+        onConnected={handleWalletConnected}
+        onBack={() => setView("profile")}
+      />
+    );
+  }
+
   if (view === "battle-invite" && pendingBattle) {
     return (
       <BattleInvite
@@ -283,6 +292,8 @@ export default function Home() {
         attackerLevel={pendingBattle.attackerLevel}
         attackerSkin={pendingBattle.attackerSkin}
         attackerRank={pendingBattle.attackerRank}
+        battleMode={pendingBattle.battleMode}
+        wagerAmount={pendingBattle.wagerAmount}
         onAccept={handleAcceptBattle}
         onDecline={handleDeclineBattle}
       />
@@ -307,6 +318,8 @@ export default function Home() {
     return (
       <BattleScanner
         playerPk={player.publicKey}
+        hasWallet={!!walletAddress}
+        onConnectWallet={handleConnectWallet}
         onBack={() => setView("profile")}
       />
     );
@@ -318,7 +331,9 @@ export default function Home() {
         etherAddress={player.etherAddress}
         publicKey={player.publicKey}
         username={player.username}
+        walletAddress={walletAddress}
         onBattle={() => setView("battle")}
+        onConnectWallet={handleConnectWallet}
         onLogout={handleLogout}
       />
     );

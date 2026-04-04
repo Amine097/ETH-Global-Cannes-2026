@@ -18,6 +18,9 @@ export interface PlayerProfile {
   rank: string; // bronze, silver, gold, platinum, diamond
   skinIndex: number; // 1–6
 
+  // Wallet (for betting via Dynamic)
+  walletAddress: string;
+
   // Meta
   linkedAt: string; // ISO date
 }
@@ -146,6 +149,7 @@ export function saveBinding(binding: Binding): void {
     level: existing?.level ?? 1,
     rank: existing?.rank ?? "bronze",
     skinIndex: existing?.skinIndex ?? 1,
+    walletAddress: existing?.walletAddress ?? "",
     linkedAt: existing?.linkedAt ?? new Date().toISOString(),
   };
 
@@ -200,6 +204,7 @@ export async function getProfileFromEns(publicKey: string): Promise<PlayerProfil
       level: parseInt(records.level) || 1,
       rank: records.rank || "bronze",
       skinIndex: parseInt(records.skinIndex) || 1,
+      walletAddress: local.walletAddress || "",
       linkedAt: records.linkedAt || local.linkedAt,
     };
   } catch (err) {
@@ -208,7 +213,7 @@ export async function getProfileFromEns(publicKey: string): Promise<PlayerProfil
   }
 }
 
-export function updateProfile(publicKey: string, updates: Partial<Pick<PlayerProfile, "worldId" | "xp" | "level" | "rank" | "skinIndex">>): PlayerProfile | null {
+export function updateProfile(publicKey: string, updates: Partial<Pick<PlayerProfile, "worldId" | "xp" | "level" | "rank" | "skinIndex" | "walletAddress">>): PlayerProfile | null {
   const players = loadPlayers();
   const key = publicKey.toLowerCase();
   const p = players[key];
@@ -219,6 +224,7 @@ export function updateProfile(publicKey: string, updates: Partial<Pick<PlayerPro
   if (updates.level !== undefined) p.level = updates.level;
   if (updates.rank !== undefined) p.rank = updates.rank;
   if (updates.skinIndex !== undefined) p.skinIndex = updates.skinIndex;
+  if (updates.walletAddress !== undefined) p.walletAddress = updates.walletAddress;
 
   savePlayers(players);
 

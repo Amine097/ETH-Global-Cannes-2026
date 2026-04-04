@@ -1,11 +1,10 @@
 "use client";
 
 interface Props {
-  onLogin: () => void;
-  onSignup: () => void;
+  onEnter: () => void;
 }
 
-export const Welcome = ({ onLogin, onSignup }: Props) => {
+export const Welcome = ({ onEnter }: Props) => {
   return (
     <div className="realm-bg flex min-h-screen flex-col items-center justify-center px-6">
       {/* Ambient glow layer */}
@@ -51,21 +50,13 @@ export const Welcome = ({ onLogin, onSignup }: Props) => {
           <div className="h-px flex-1 bg-gradient-to-l from-transparent to-[#3d2a10]" />
         </div>
 
-        {/* Action buttons */}
-        <div className="flex flex-col gap-4">
-          <button
-            onClick={onLogin}
-            className="btn-gold w-full rounded-lg px-8 py-4 text-base"
-          >
-            Enter the Realm
-          </button>
-          <button
-            onClick={onSignup}
-            className="btn-outline-gold w-full rounded-lg px-8 py-4 text-base"
-          >
-            Pledge Your Oath
-          </button>
-        </div>
+        {/* Action button */}
+        <button
+          onClick={onEnter}
+          className="btn-gold w-full rounded-lg px-8 py-4 text-base"
+        >
+          Enter the Realm
+        </button>
 
         {/* Footer badges */}
         <div className="mt-14 flex items-center justify-center gap-4 font-cinzel text-[10px] tracking-[0.3em] text-[#3d2a10] uppercase">

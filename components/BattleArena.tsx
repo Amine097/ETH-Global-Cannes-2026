@@ -293,6 +293,20 @@ export const BattleArena = ({ battleId, playerPk, role, onDone }: Props) => {
           </div>
         </div>
 
+        {/* Wager result */}
+        {battle?.mode === "wager" && battle.wagerAmount && (
+          <div className="mb-5 rounded-lg border border-[#c9a227]/30 bg-[#c9a227]/5 p-4 text-center">
+            <p className="font-cinzel text-[10px] tracking-[0.3em] text-[#7a6845] uppercase">
+              {iWon ? "Bounty Claimed" : "Bounty Lost"}
+            </p>
+            <p className={`mt-1 font-cinzel text-2xl font-black ${iWon ? "text-[#c9a227]" : "text-[#e04444]"}`}
+               style={{ textShadow: iWon ? "0 0 20px rgba(201,162,39,0.4)" : "none" }}>
+              {iWon ? "+" : "-"}{battle.wagerAmount} ETH
+            </p>
+            <p className="mt-1 font-crimson text-[10px] text-[#5a4010]">Settled via Dynamic escrow</p>
+          </div>
+        )}
+
         <button
           onClick={onDone}
           className="btn-gold w-full rounded-lg px-8 py-4 text-base"

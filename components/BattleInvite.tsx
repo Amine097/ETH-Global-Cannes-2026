@@ -25,6 +25,8 @@ interface Props {
   attackerLevel: number;
   attackerSkin: number;
   attackerRank: string;
+  battleMode: "free" | "wager";
+  wagerAmount?: string;
   onAccept: () => void;
   onDecline: () => void;
 }
@@ -34,6 +36,8 @@ export const BattleInvite = ({
   attackerLevel,
   attackerSkin,
   attackerRank,
+  battleMode,
+  wagerAmount,
   onAccept,
   onDecline,
 }: Props) => {
@@ -81,6 +85,18 @@ export const BattleInvite = ({
           </h1>
           <p className="mt-1 font-crimson text-sm text-[#7a6845]">demands satisfaction on the field of battle</p>
         </div>
+
+        {/* Wager banner */}
+        {battleMode === "wager" && wagerAmount && (
+          <div className="mb-4 rounded-lg border border-[#c9a227]/40 bg-[#c9a227]/10 px-4 py-3 text-center">
+            <p className="font-cinzel text-xs tracking-widest text-[#c9a227] uppercase">Wager Battle</p>
+            <p className="mt-1 font-cinzel text-xl font-black text-[#c9a227]"
+               style={{ textShadow: "0 0 15px rgba(201,162,39,0.4)" }}>
+              {wagerAmount} ETH
+            </p>
+            <p className="mt-1 font-crimson text-[10px] text-[#7a6845]">Winner takes all · Powered by Dynamic</p>
+          </div>
+        )}
 
         {/* Challenger stats */}
         <div className="medieval-card mb-5 p-4">

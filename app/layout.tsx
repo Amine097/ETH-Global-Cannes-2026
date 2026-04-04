@@ -4,6 +4,11 @@ import "./globals.css";
 import dynamic from "next/dynamic";
 import NextAuthProvider from "@/components/next-auth-provider";
 
+const DynamicWalletProvider = dynamic(
+  () => import("../components/DynamicProvider"),
+  { ssr: false }
+);
+
 const ErudaProvider = dynamic(
   () => import("../components/Eruda").then((c) => c.ErudaProvider),
   { ssr: false }
@@ -38,9 +43,11 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${cinzel.variable} ${crimsonText.variable}`}>
         <NextAuthProvider>
-          <ErudaProvider>
-            {children}
-          </ErudaProvider>
+          <DynamicWalletProvider>
+            <ErudaProvider>
+              {children}
+            </ErudaProvider>
+          </DynamicWalletProvider>
         </NextAuthProvider>
       </body>
     </html>

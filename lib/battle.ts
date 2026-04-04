@@ -5,16 +5,21 @@ import { getProfile, updateProfile } from "./store";
 
 export type BattleStatus = "pending" | "accepted" | "declined" | "resolved" | "expired";
 
+export type BattleMode = "free" | "wager";
+
 export interface BattleFighter {
   publicKey: string;
   username: string;
   level: number;
   skinIndex: number;
   rank: string;
+  walletAddress?: string;
 }
 
 export interface Battle {
   id: string;
+  mode: BattleMode;
+  wagerAmount?: string; // in ETH, e.g. "0.01"
   attacker: BattleFighter;
   defender: BattleFighter;
   status: BattleStatus;
@@ -26,6 +31,9 @@ export interface Battle {
   defenderNewLevel?: number;
   attackerNewRank?: string;
   defenderNewRank?: string;
+  // Escrow (for wager battles)
+  escrowAddress?: string;
+  payoutTx?: string;
 }
 
 // ── In-memory battle state (use globalThis to survive HMR) ──
@@ -65,13 +73,25 @@ export function rankFromLevel(level: number): string {
 
 // ── Battle logic ──
 
-export function createBattle(attackerPk: string, defenderPk: string): Battle | { error: string } {
+export function createBattle(
+  attackerPk: string,
+  defenderPk: string,
+  mode: BattleMode = "free",
+  wagerAmount?: string,
+): Battle | { error: string } {
   const attacker = getProfile(attackerPk);
   const defender = getProfile(defenderPk);
 
   if (!attacker || !attacker.username) return { error: "Attacker not found" };
   if (!defender || !defender.username) return { error: "Opponent not found" };
   if (attackerPk.toLowerCase() === defenderPk.toLowerCase()) return { error: "Cannot battle yourself" };
+
+  // Wager battles require both players to have a connected wallet
+  if (mode === "wager") {
+    if (!attacker.walletAddress) return { error: "You need a connected wallet to wager" };
+    if (!defender.walletAddress) return { error: "Opponent has no connected wallet" };
+    if (!wagerAmount || parseFloat(wagerAmount) <= 0) return { error: "Invalid wager amount" };
+  }
 
   // Check if defender already has a pending battle
   const existing = pendingByDefender.get(defenderPk.toLowerCase());
@@ -80,7 +100,6 @@ export function createBattle(attackerPk: string, defenderPk: string): Battle | {
     if (b && b.status === "pending" && Date.now() - b.createdAt < 60_000) {
       return { error: "Opponent already has a pending battle" };
     }
-    // Clean up stale
     pendingByDefender.delete(defenderPk.toLowerCase());
   }
 
@@ -88,12 +107,15 @@ export function createBattle(attackerPk: string, defenderPk: string): Battle | {
 
   const battle: Battle = {
     id,
+    mode,
+    wagerAmount: mode === "wager" ? wagerAmount : undefined,
     attacker: {
       publicKey: attacker.publicKey,
       username: attacker.username,
       level: levelFromXp(attacker.xp),
       skinIndex: attacker.skinIndex,
       rank: rankFromLevel(levelFromXp(attacker.xp)),
+      walletAddress: attacker.walletAddress || undefined,
     },
     defender: {
       publicKey: defender.publicKey,
@@ -101,6 +123,7 @@ export function createBattle(attackerPk: string, defenderPk: string): Battle | {
       level: levelFromXp(defender.xp),
       skinIndex: defender.skinIndex,
       rank: rankFromLevel(levelFromXp(defender.xp)),
+      walletAddress: defender.walletAddress || undefined,
     },
     status: "pending",
     createdAt: Date.now(),

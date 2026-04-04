@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
       level: profile?.level ?? 1,
       rank: profile?.rank ?? "bronze",
       skinIndex: profile?.skinIndex ?? 1,
+      walletAddress: profile?.walletAddress ?? "",
     },
   });
 }
