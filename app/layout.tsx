@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Cinzel, Crimson_Text } from "next/font/google";
 import "./globals.css";
 import dynamic from "next/dynamic";
 import NextAuthProvider from "@/components/next-auth-provider";
@@ -9,11 +9,24 @@ const ErudaProvider = dynamic(
   { ssr: false }
 );
 
-const inter = Inter({ subsets: ["latin"] });
+const cinzel = Cinzel({
+  subsets: ["latin"],
+  variable: "--font-cinzel",
+  weight: ["400", "500", "600", "700", "800", "900"],
+  display: "swap",
+});
+
+const crimsonText = Crimson_Text({
+  subsets: ["latin"],
+  variable: "--font-crimson",
+  weight: ["400", "600"],
+  style: ["normal", "italic"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Raid Battle",
-  description: "Scan your HaLo bracelet. Prove your identity. Enter the game.",
+  description: "Scan your sigil. Prove your lineage. Enter the realm.",
 };
 
 export default function RootLayout({
@@ -23,7 +36,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={`${cinzel.variable} ${crimsonText.variable}`}>
         <NextAuthProvider>
           <ErudaProvider>
             {children}

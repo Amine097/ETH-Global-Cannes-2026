@@ -2,13 +2,22 @@
 
 import { useEffect, useState } from "react";
 
-const SKINS = ["🗡️", "🛡️", "🔮", "🏹", "⚡", "🔥"];
+const SKINS = ["⚔️", "🛡️", "🔮", "🏹", "⚡", "🔥"];
+
+const RANK_LABELS: Record<string, string> = {
+  bronze: "Squire",
+  silver: "Knight",
+  gold: "Lord",
+  platinum: "Duke",
+  diamond: "Legend",
+};
+
 const RANK_COLORS: Record<string, string> = {
-  bronze: "text-orange-400",
-  silver: "text-gray-300",
-  gold: "text-yellow-400",
-  platinum: "text-cyan-300",
-  diamond: "text-purple-400",
+  bronze: "text-[#cd7f32]",
+  silver: "text-[#c0c0c0]",
+  gold: "text-[#c9a227]",
+  platinum: "text-[#7dd8e6]",
+  diamond: "text-[#b57dee]",
 };
 
 interface Props {
@@ -43,60 +52,87 @@ export const BattleInvite = ({
     return () => clearInterval(timer);
   }, [onDecline]);
 
+  const rankLabel = RANK_LABELS[attackerRank] ?? attackerRank;
+  const rankColor = RANK_COLORS[attackerRank] ?? "text-[#f0e6c8]";
+
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6">
-      <div className="w-full max-w-sm">
-        {/* Pulse ring */}
-        <div className="relative mx-auto mb-8 flex h-32 w-32 items-center justify-center">
-          <div className="absolute inset-0 animate-ping rounded-full bg-red-500/20" />
-          <div className="absolute inset-2 animate-pulse rounded-full bg-red-500/10" />
-          <span className="relative text-6xl">{SKINS[(attackerSkin - 1) % 6]}</span>
+    <div className="realm-bg flex min-h-screen flex-col items-center justify-center px-6">
+      {/* Crimson danger glow */}
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_50%_20%,rgba(139,26,26,0.12),transparent_65%)]" />
+
+      <div className="relative w-full max-w-sm">
+        {/* Pulsing challenger avatar */}
+        <div className="relative mx-auto mb-6 flex h-32 w-32 items-center justify-center">
+          <div className="absolute inset-0 animate-ping rounded-full bg-[rgba(139,26,26,0.15)]" />
+          <div className="absolute inset-2 animate-pulse rounded-full bg-[rgba(139,26,26,0.08)]" />
+          <div className="relative flex h-24 w-24 items-center justify-center rounded-full border-2 border-[#8b1a1a]/40 bg-[#100e08]">
+            <span className="text-4xl">{SKINS[(attackerSkin - 1) % 6]}</span>
+          </div>
         </div>
 
-        <h1 className="mb-1 text-center text-2xl font-bold">Battle Request!</h1>
-        <p className="mb-6 text-center text-sm text-[#888]">
-          <span className="font-semibold text-white">{attackerUsername}</span> wants to fight
-        </p>
+        {/* Challenge text */}
+        <div className="mb-6 text-center">
+          <p className="font-cinzel text-xs tracking-[0.35em] text-[#7a3a3a] uppercase mb-2">
+            A Challenger Approaches
+          </p>
+          <h1 className="font-cinzel text-2xl font-bold tracking-wide text-[#f0e6c8]"
+              style={{ textShadow: "0 0 20px rgba(139,26,26,0.3)" }}>
+            {attackerUsername}
+          </h1>
+          <p className="mt-1 font-crimson text-sm text-[#7a6845]">demands satisfaction on the field of battle</p>
+        </div>
 
-        {/* Opponent stats */}
-        <div className="mb-6 rounded-2xl border border-[#1e1e1e] bg-[#111] p-4">
+        {/* Challenger stats */}
+        <div className="medieval-card mb-5 p-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-[#888]">Level</span>
-            <span className="text-sm font-bold text-white">{attackerLevel}</span>
+            <span className="font-cinzel text-xs tracking-wider text-[#5a4010] uppercase">Level</span>
+            <span className="font-cinzel text-sm font-bold text-[#f0e6c8]">{attackerLevel}</span>
           </div>
-          <div className="mt-2 flex items-center justify-between">
-            <span className="text-sm text-[#888]">Rank</span>
-            <span className={`text-sm font-bold capitalize ${RANK_COLORS[attackerRank] ?? "text-white"}`}>
-              {attackerRank}
-            </span>
+          <div className="my-3 h-px bg-[#1e1608]" />
+          <div className="flex items-center justify-between">
+            <span className="font-cinzel text-xs tracking-wider text-[#5a4010] uppercase">Title</span>
+            <span className={`font-cinzel text-sm font-bold ${rankColor}`}>{rankLabel}</span>
           </div>
         </div>
 
-        {/* Timer bar */}
-        <div className="mb-6 overflow-hidden rounded-full bg-[#1e1e1e]">
-          <div
-            className="h-1 rounded-full bg-red-500 transition-all duration-1000"
-            style={{ width: `${(timeLeft / 30) * 100}%` }}
-          />
+        {/* Countdown bar */}
+        <div className="mb-5">
+          <div className="mb-2 flex justify-between font-cinzel text-[10px] tracking-widest text-[#5a4010] uppercase">
+            <span>Time to decide</span>
+            <span className={(timeLeft <= 10 ? "text-[#e04444]" : "")}>{timeLeft}s</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-[#1e1608]">
+            <div
+              className="h-full rounded-full transition-all duration-1000"
+              style={{
+                width: `${(timeLeft / 30) * 100}%`,
+                background: timeLeft <= 10
+                  ? "linear-gradient(90deg, #6e1010, #b02020)"
+                  : "linear-gradient(90deg, #8b1a1a, #cc3333)",
+                boxShadow: "0 0 8px rgba(139,26,26,0.5)",
+              }}
+            />
+          </div>
         </div>
 
+        {/* Action buttons */}
         <div className="flex gap-3">
           <button
             onClick={onDecline}
-            className="flex-1 rounded-2xl border border-[#333] bg-transparent px-6 py-4 text-lg font-semibold text-white active:opacity-80"
+            className="btn-outline-gold flex-1 rounded-lg px-4 py-4 text-base"
           >
-            Decline
+            Refuse
           </button>
           <button
             onClick={onAccept}
-            className="flex-1 rounded-2xl bg-[#22c55e] px-6 py-4 text-lg font-bold text-black active:opacity-80"
+            className="btn-crimson flex-1 rounded-lg px-4 py-4 text-base"
           >
-            Accept
+            Accept ⚔
           </button>
         </div>
 
-        <p className="mt-4 text-center text-xs text-[#888]">
-          Auto-decline in {timeLeft}s
+        <p className="mt-4 text-center font-cinzel text-[10px] tracking-wider text-[#3d2a10]">
+          Silence is cowardice — auto-refuse in {timeLeft}s
         </p>
       </div>
     </div>

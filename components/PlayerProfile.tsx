@@ -3,13 +3,38 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import QRCode from "qrcode";
 
-const SKINS = ["🗡️", "🛡️", "🔮", "🏹", "⚡", "🔥"];
+const SKINS = ["⚔️", "🛡️", "🔮", "🏹", "⚡", "🔥"];
+
+const RANK_LABELS: Record<string, string> = {
+  bronze: "Squire",
+  silver: "Knight",
+  gold: "Lord",
+  platinum: "Duke",
+  diamond: "Legend",
+};
+
 const RANK_COLORS: Record<string, string> = {
-  bronze: "text-orange-400",
-  silver: "text-gray-300",
-  gold: "text-yellow-400",
-  platinum: "text-cyan-300",
-  diamond: "text-purple-400",
+  bronze: "text-[#cd7f32]",
+  silver: "text-[#c0c0c0]",
+  gold: "text-[#c9a227]",
+  platinum: "text-[#7dd8e6]",
+  diamond: "text-[#b57dee]",
+};
+
+const RANK_BORDER: Record<string, string> = {
+  bronze: "border-[#cd7f32]/30",
+  silver: "border-[#c0c0c0]/30",
+  gold: "border-[#c9a227]/40",
+  platinum: "border-[#7dd8e6]/30",
+  diamond: "border-[#b57dee]/40",
+};
+
+const RANK_ICONS: Record<string, string> = {
+  bronze: "🥉",
+  silver: "🥈",
+  gold: "👑",
+  platinum: "💎",
+  diamond: "🌟",
 };
 
 interface ProfileData {
@@ -27,7 +52,6 @@ interface Props {
   onLogout: () => void;
 }
 
-// XP needed for a given level (must match lib/battle.ts)
 function xpForLevel(level: number): number {
   if (level <= 1) return 0;
   return level * (level - 1) * 50;
@@ -60,9 +84,9 @@ export const PlayerProfile = ({ etherAddress, publicKey, username, onBattle, onL
   useEffect(() => {
     if (canvasRef.current && publicKey) {
       QRCode.toCanvas(canvasRef.current, publicKey, {
-        width: 180,
+        width: 160,
         margin: 2,
-        color: { dark: "#ffffff", light: "#00000000" },
+        color: { dark: "#c9a227", light: "#00000000" },
       });
     }
   }, [publicKey]);
@@ -73,72 +97,125 @@ export const PlayerProfile = ({ etherAddress, publicKey, username, onBattle, onL
     ? ((profile.xp - currentLevelXp) / (nextLevelXp - currentLevelXp)) * 100
     : 100;
 
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6">
-      <div className="w-full max-w-sm">
-        {/* Avatar + Name */}
-        <div className="mb-6 text-center">
-          <div className="mb-3 text-5xl">{SKINS[(profile.skinIndex - 1) % 6]}</div>
-          <h1 className="text-3xl font-bold">{username}</h1>
-          <p className="mt-1 text-sm text-[#22c55e]">{username.toLowerCase()}.eth</p>
-        </div>
+  const rankLabel = RANK_LABELS[profile.rank] ?? profile.rank;
+  const rankColor = RANK_COLORS[profile.rank] ?? "text-[#f0e6c8]";
+  const rankBorder = RANK_BORDER[profile.rank] ?? "border-[#2e2010]";
+  const rankIcon = RANK_ICONS[profile.rank] ?? "⚔️";
 
-        {/* Level + XP bar */}
-        <div className="mb-4 rounded-2xl border border-[#1e1e1e] bg-[#111] p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm font-semibold text-white">Level {profile.level}</span>
-            <span className={`text-sm font-bold capitalize ${RANK_COLORS[profile.rank] ?? "text-white"}`}>
-              {profile.rank}
+  return (
+    <div className="realm-bg flex min-h-screen flex-col items-center justify-center px-6 py-8">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_50%_10%,rgba(201,162,39,0.06),transparent_60%)]" />
+
+      <div className="relative w-full max-w-sm">
+        {/* Avatar + Identity */}
+        <div className="mb-5 text-center">
+          {/* Avatar in styled ring */}
+          <div className={`relative mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full border-2 ${rankBorder} bg-[#100e08]`}
+               style={{ boxShadow: `0 0 24px rgba(201,162,39,0.12)` }}>
+            <span className="text-4xl">{SKINS[(profile.skinIndex - 1) % 6]}</span>
+          </div>
+
+          <h1 className="font-cinzel text-2xl font-bold tracking-wide text-[#f0e6c8]"
+              style={{ textShadow: "0 0 20px rgba(201,162,39,0.2)" }}>
+            {username}
+          </h1>
+          <p className="mt-1 font-cinzel text-xs tracking-widest text-[#5a4010]">
+            {username.toLowerCase()}.raidbattle.eth
+          </p>
+
+          {/* Rank badge */}
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[#2e2010] bg-[#100e08] px-4 py-1.5">
+            <span className="text-base">{rankIcon}</span>
+            <span className={`font-cinzel text-sm font-semibold tracking-wider ${rankColor}`}>
+              {rankLabel}
             </span>
           </div>
-          <div className="overflow-hidden rounded-full bg-[#1e1e1e]">
+        </div>
+
+        {/* Level + XP */}
+        <div className="medieval-card mb-3 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-cinzel text-xs tracking-widest text-[#7a6845] uppercase">Glory</span>
+            <span className="font-cinzel text-xs font-semibold text-[#f0e6c8]">
+              Level {profile.level}
+            </span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-[#1e1608]">
             <div
-              className="h-2 rounded-full bg-[#22c55e] transition-all duration-500"
-              style={{ width: `${Math.min(100, xpProgress)}%` }}
+              className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${Math.min(100, xpProgress)}%`,
+                background: "linear-gradient(90deg, #9e7d1a, #c9a227)",
+                boxShadow: "0 0 8px rgba(201,162,39,0.4)",
+              }}
             />
           </div>
-          <p className="mt-1 text-right text-xs text-[#888]">
-            {profile.xp} / {nextLevelXp} XP
+          <div className="mt-1.5 flex justify-between font-cinzel text-xs text-[#5a4010]">
+            <span>{profile.xp} XP</span>
+            <span>{nextLevelXp} XP</span>
+          </div>
+        </div>
+
+        {/* QR Code — show to opponent */}
+        <div className="medieval-card mb-3 flex flex-col items-center p-5">
+          <p className="mb-3 font-cinzel text-[10px] tracking-[0.3em] text-[#5a4010] uppercase">
+            Your Sigil — Show to Challenger
+          </p>
+          <div className="rounded-lg border border-[#2e2010] bg-[#0d0b06] p-3">
+            <canvas ref={canvasRef} />
+          </div>
+          <p className="mt-2 font-crimson text-xs text-[#3d2a10]">
+            Opponent scans this to challenge you
           </p>
         </div>
 
-        {/* QR Code */}
-        <div className="mb-4 flex flex-col items-center rounded-2xl border border-[#1e1e1e] bg-[#111] p-6">
-          <canvas ref={canvasRef} className="mb-3" />
-          <p className="text-xs text-[#888]">Show this to your opponent</p>
-        </div>
-
         {/* Stats */}
-        <div className="mb-6 rounded-2xl border border-[#1e1e1e] bg-[#111] p-5">
-          <div className="space-y-4">
-            <Row label="Bracelet" value={etherAddress.slice(0, 8) + "..." + etherAddress.slice(-6)} mono />
-            <Row label="World ID" value="Verified" accent />
+        <div className="medieval-card mb-5 p-4">
+          <div className="space-y-3">
+            <StatRow label="Bracelet" value={etherAddress.slice(0, 8) + "…" + etherAddress.slice(-6)} mono />
+            <div className="h-px bg-[#1e1608]" />
+            <StatRow label="World ID" value="Verified ✓" accent />
           </div>
         </div>
 
+        {/* Battle button */}
         <button
           onClick={onBattle}
-          className="mb-3 w-full rounded-2xl bg-[#22c55e] px-8 py-4 text-lg font-bold text-black active:opacity-80"
+          className="btn-gold mb-3 w-full rounded-lg px-8 py-4 text-base"
         >
-          Battle!
+          ⚔ Seek Battle
         </button>
 
         <button
           onClick={onLogout}
-          className="w-full rounded-xl py-3 text-sm text-[#888] hover:text-white"
+          className="w-full rounded-lg py-3 font-cinzel text-xs tracking-wider text-[#3d2a10] hover:text-[#5a4010] transition-colors"
         >
-          Log out
+          Abandon the Realm
         </button>
       </div>
     </div>
   );
 };
 
-function Row({ label, value, mono, accent }: { label: string; value: string; mono?: boolean; accent?: boolean }) {
+function StatRow({
+  label,
+  value,
+  mono,
+  accent,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  accent?: boolean;
+}) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-sm text-[#888]">{label}</span>
-      <span className={`text-sm ${mono ? "font-mono" : ""} ${accent ? "font-semibold text-[#22c55e]" : "text-white"}`}>
+      <span className="font-cinzel text-xs tracking-wider text-[#5a4010] uppercase">{label}</span>
+      <span
+        className={`font-crimson text-sm ${mono ? "font-mono tracking-tight" : ""} ${
+          accent ? "font-semibold text-[#c9a227]" : "text-[#f0e6c8]"
+        }`}
+      >
         {value}
       </span>
     </div>

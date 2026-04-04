@@ -66,13 +66,11 @@ export const WorldVerify = ({ onVerified, onBack }: Props) => {
     console.error("IDKit error:", errorCode);
     setVerifying(false);
     setWidgetOpen(false);
-
     if (errorCode === "connection_failed" || errorCode === "timeout") {
-      setError("Connection to World App failed. Make sure World App is installed and try again.");
+      setError("Connection to World App failed. Ensure World App is installed and try again.");
     } else if (errorCode === "user_rejected") {
       setError("Verification was rejected in World App.");
     } else if (errorCode === "cancelled") {
-      // Refresh rp_context for next attempt
       setError(null);
       fetchRpContext();
     } else if (errorCode === "verification_rejected") {
@@ -83,31 +81,49 @@ export const WorldVerify = ({ onVerified, onBack }: Props) => {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6">
-      <div className="w-full max-w-sm">
-        <h1 className="mb-2 text-center text-2xl font-bold">Verify Identity</h1>
-        <p className="mb-8 text-center text-sm text-[#888]">
-          Prove you are a unique human with World ID
-        </p>
+    <div className="realm-bg flex min-h-screen flex-col items-center justify-center px-6">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_50%_15%,rgba(201,162,39,0.06),transparent_65%)]" />
+
+      <div className="relative w-full max-w-sm">
+        {/* Header */}
+        <div className="mb-8 text-center">
+          <div className="mb-4 flex justify-center">
+            <span className="text-4xl">🌐</span>
+          </div>
+          <h1 className="font-cinzel text-2xl font-bold tracking-wider text-[#f0e6c8]">
+            Prove Your Lineage
+          </h1>
+          <p className="mt-2 font-crimson text-sm text-[#7a6845]">
+            Only true humans may enter the realm
+          </p>
+        </div>
+
+        {/* Ornament */}
+        <div className="mb-6 flex items-center gap-3">
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent to-[#3d2a10]" />
+          <span className="text-[#5a4010] text-sm">✦</span>
+          <div className="h-px flex-1 bg-gradient-to-l from-transparent to-[#3d2a10]" />
+        </div>
 
         {loadingCtx && (
-          <div className="rounded-2xl border border-[#1e1e1e] bg-[#111] p-8 text-center">
-            <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[#888] border-t-white" />
-            <p className="text-sm text-[#888]">Loading World ID...</p>
+          <div className="medieval-card p-8 text-center">
+            <div className="mx-auto mb-4 h-8 w-8 spinner-gold" />
+            <p className="font-crimson text-sm text-[#7a6845]">Consulting the oracle...</p>
           </div>
         )}
 
         {!loadingCtx && !rpContext && (
           <div className="flex flex-col gap-3">
-            <div className="rounded-2xl border border-[#1e1e1e] bg-[#111] p-8 text-center">
-              <p className="text-sm text-[#888]">World ID unavailable</p>
+            <div className="medieval-card p-8 text-center">
+              <p className="font-crimson text-sm text-[#7a6845]">The oracle is unreachable</p>
             </div>
-            {error && <p className="text-center text-xs text-red-400">{error}</p>}
-            <button
-              onClick={fetchRpContext}
-              className="w-full rounded-2xl border border-[#333] bg-transparent px-6 py-3 text-sm text-white active:opacity-80"
-            >
-              Retry
+            {error && (
+              <div className="rounded-lg border border-[#8b1a1a]/40 bg-[#8b1a1a]/10 px-4 py-3 text-center">
+                <p className="font-crimson text-sm text-[#e04444]">{error}</p>
+              </div>
+            )}
+            <button onClick={fetchRpContext} className="btn-outline-gold w-full rounded-lg px-6 py-3 text-sm">
+              Try Again
             </button>
           </div>
         )}
@@ -115,14 +131,14 @@ export const WorldVerify = ({ onVerified, onBack }: Props) => {
         {!loadingCtx && rpContext && (
           <>
             {verifying ? (
-              <div className="rounded-2xl border border-[#1e1e1e] bg-[#111] p-8 text-center">
-                <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[#888] border-t-white" />
-                <p className="text-sm text-[#888]">Verifying proof...</p>
+              <div className="medieval-card p-8 text-center">
+                <div className="mx-auto mb-4 h-8 w-8 spinner-gold" />
+                <p className="font-crimson text-sm text-[#7a6845]">Verifying your bloodline...</p>
               </div>
             ) : (
               <button
                 onClick={() => { setError(null); setWidgetOpen(true); }}
-                className="w-full rounded-2xl bg-white px-8 py-4 text-lg font-bold text-black transition-opacity active:opacity-80"
+                className="btn-gold w-full rounded-lg px-8 py-4 text-base"
               >
                 Verify with World ID
               </button>
@@ -145,14 +161,16 @@ export const WorldVerify = ({ onVerified, onBack }: Props) => {
         )}
 
         {error && !loadingCtx && rpContext && (
-          <p className="mt-3 text-center text-xs text-red-400">{error}</p>
+          <div className="mt-3 rounded-lg border border-[#8b1a1a]/40 bg-[#8b1a1a]/10 px-4 py-3 text-center">
+            <p className="font-crimson text-sm text-[#e04444]">{error}</p>
+          </div>
         )}
 
         <button
           onClick={onBack}
-          className="mt-6 w-full rounded-xl py-3 text-sm text-[#888] hover:text-white"
+          className="mt-6 w-full rounded-lg py-3 font-cinzel text-xs tracking-wider text-[#5a4010] hover:text-[#7a6845] transition-colors"
         >
-          Back
+          ← Retreat
         </button>
       </div>
     </div>

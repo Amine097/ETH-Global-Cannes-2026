@@ -30,7 +30,6 @@ export const BattleScanner = ({ playerPk, onBack }: Props) => {
     }
   }
 
-  // ── NFC scan (Android) ──
   async function startNfcScan() {
     setStep("scanning-nfc");
     setError(null);
@@ -46,7 +45,6 @@ export const BattleScanner = ({ playerPk, onBack }: Props) => {
     }
   }
 
-  // ── QR scan (iOS / fallback) ──
   const startQrScan = useCallback(async () => {
     setStep("scanning-qr");
     setError(null);
@@ -80,7 +78,6 @@ export const BattleScanner = ({ playerPk, onBack }: Props) => {
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
     import("jsqr").then((jsQR) => {
       const code = jsQR.default(imageData.data, imageData.width, imageData.height);
       if (code && code.data) {
@@ -93,7 +90,6 @@ export const BattleScanner = ({ playerPk, onBack }: Props) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Initiate battle ──
   async function initiateBattle(defenderPk: string) {
     setStep("initiating");
     try {
@@ -118,17 +114,16 @@ export const BattleScanner = ({ playerPk, onBack }: Props) => {
     }
   }
 
-  // ── Poll for acceptance ──
   function startPolling(id: string) {
     pollingRef.current = true;
     let attempts = 0;
     const interval = setInterval(async () => {
       if (!pollingRef.current) { clearInterval(interval); return; }
       attempts++;
-      if (attempts > 30) { // 60s timeout
+      if (attempts > 30) {
         pollingRef.current = false;
         clearInterval(interval);
-        setError("Opponent didn't respond");
+        setError("Opponent did not respond to the challenge");
         setStep("error");
         return;
       }
@@ -153,7 +148,6 @@ export const BattleScanner = ({ playerPk, onBack }: Props) => {
     }, 2000);
   }
 
-  // Cleanup
   useEffect(() => {
     return () => {
       stopCamera();
@@ -161,7 +155,6 @@ export const BattleScanner = ({ playerPk, onBack }: Props) => {
     };
   }, []);
 
-  // ── Arena phase ──
   if (step === "arena" && battleId) {
     return (
       <BattleArena
@@ -174,83 +167,121 @@ export const BattleScanner = ({ playerPk, onBack }: Props) => {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6">
-      <div className="w-full max-w-sm">
-        <h1 className="mb-2 text-center text-2xl font-bold">Battle</h1>
-        <p className="mb-6 text-center text-sm text-[#888]">
-          Scan your opponent&apos;s bracelet to challenge them
-        </p>
+    <div className="realm-bg flex min-h-screen flex-col items-center justify-center px-6">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_50%_15%,rgba(201,162,39,0.06),transparent_65%)]" />
+
+      <div className="relative w-full max-w-sm">
+        {/* Header */}
+        <div className="mb-6 text-center">
+          <h1 className="font-cinzel text-2xl font-bold tracking-wider text-[#f0e6c8]">Seek Battle</h1>
+          <p className="mt-1 font-crimson text-sm text-[#7a6845]">
+            Find a worthy foe and issue your challenge
+          </p>
+        </div>
+
+        {/* Ornament */}
+        <div className="mb-5 flex items-center gap-3">
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent to-[#3d2a10]" />
+          <span className="text-[#5a4010] text-sm">⚔</span>
+          <div className="h-px flex-1 bg-gradient-to-l from-transparent to-[#3d2a10]" />
+        </div>
 
         {/* Idle */}
         {step === "idle" && (
           <div className="flex flex-col gap-4">
-            <button onClick={startNfcScan} className="w-full rounded-2xl bg-white px-8 py-4 text-lg font-bold text-black active:opacity-80">
-              Scan bracelet (NFC)
+            <button
+              onClick={startNfcScan}
+              className="btn-gold w-full rounded-lg px-8 py-4 text-base"
+            >
+              📿 Touch Their Bracelet
             </button>
             <div className="flex items-center gap-3">
-              <div className="h-px flex-1 bg-[#1e1e1e]" />
-              <span className="text-xs text-[#888]">or</span>
-              <div className="h-px flex-1 bg-[#1e1e1e]" />
+              <div className="h-px flex-1 bg-[#2e2010]" />
+              <span className="font-cinzel text-[10px] tracking-widest text-[#3d2a10] uppercase">or</span>
+              <div className="h-px flex-1 bg-[#2e2010]" />
             </div>
-            <button onClick={startQrScan} className="w-full rounded-2xl border border-[#1e1e1e] bg-[#111] px-8 py-3 text-sm text-[#888] active:opacity-80">
-              Scan QR code instead
+            <button
+              onClick={startQrScan}
+              className="btn-outline-gold w-full rounded-lg px-8 py-3 text-sm"
+            >
+              📷 Scan Their Sigil (QR)
             </button>
           </div>
         )}
 
-        {/* Camera scanning (QR fallback) */}
+        {/* QR camera */}
         {step === "scanning-qr" && (
           <div className="flex flex-col items-center gap-4">
-            <div className="relative overflow-hidden rounded-2xl border border-[#1e1e1e]">
+            <div className="relative w-full overflow-hidden rounded-lg border border-[#2e2010]">
               <video ref={videoRef} className="h-64 w-full object-cover" playsInline muted />
-              <div className="absolute inset-0 rounded-2xl border-2 border-[#22c55e]/30 pointer-events-none" />
-              <div className="absolute inset-[25%] rounded-lg border-2 border-[#22c55e] pointer-events-none" />
+              <div className="absolute inset-0 rounded-lg border-2 border-[#c9a227]/20 pointer-events-none" />
+              <div className="absolute inset-[25%] rounded-md border-2 border-[#c9a227]/70 pointer-events-none" />
+              <div className="absolute bottom-3 left-0 right-0 text-center">
+                <span className="rounded-full bg-[#0a0806]/80 px-3 py-1 font-cinzel text-[10px] tracking-widest text-[#c9a227] uppercase">
+                  Aim at their sigil
+                </span>
+              </div>
             </div>
             <canvas ref={canvasRef} className="hidden" />
-            <p className="text-sm text-[#888]">Point at your opponent&apos;s QR code</p>
-            <button onClick={() => { stopCamera(); setStep("idle"); }} className="text-sm text-[#888] underline active:opacity-80">Cancel</button>
+            <button
+              onClick={() => { stopCamera(); setStep("idle"); }}
+              className="font-cinzel text-xs tracking-wider text-[#5a4010] hover:text-[#7a6845] transition-colors"
+            >
+              Cancel
+            </button>
           </div>
         )}
 
         {/* NFC scanning */}
         {step === "scanning-nfc" && (
-          <div className="rounded-2xl border border-[#1e1e1e] bg-[#111] p-8 text-center">
-            <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[#888] border-t-white" />
-            <p className="font-medium text-white">Tap opponent&apos;s bracelet</p>
-            <p className="mt-1 text-xs text-[#888]">Hold your phone near their wrist</p>
+          <div className="medieval-card-glow p-8 text-center">
+            <div className="relative mx-auto mb-5 flex h-16 w-16 items-center justify-center">
+              <div className="absolute inset-0 animate-spin rounded-full border-2 border-[#2e2010] border-t-[#c9a227]" />
+              <span className="text-2xl">📿</span>
+            </div>
+            <p className="font-cinzel text-sm font-semibold text-[#c9a227]">Touch their bracelet</p>
+            <p className="mt-2 font-crimson text-xs text-[#5a4010]">Hold your phone near their wrist</p>
           </div>
         )}
 
         {/* Initiating */}
         {step === "initiating" && (
-          <div className="rounded-2xl border border-[#1e1e1e] bg-[#111] p-8 text-center">
-            <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[#888] border-t-white" />
-            <p className="text-sm text-[#888]">Looking up opponent...</p>
+          <div className="medieval-card p-8 text-center">
+            <div className="mx-auto mb-4 h-8 w-8 spinner-gold" />
+            <p className="font-crimson text-sm text-[#7a6845]">Dispatching the herald...</p>
           </div>
         )}
 
         {/* Waiting for accept */}
         {step === "waiting" && (
-          <div className="rounded-2xl border border-yellow-500/30 bg-[#111] p-8 text-center">
-            <div className="mb-4 text-4xl animate-pulse">⚔️</div>
-            <p className="text-lg font-bold text-yellow-400">Challenge sent!</p>
-            <p className="mt-2 text-sm text-[#888]">
-              Waiting for <span className="font-semibold text-white">{opponentName}</span> to accept...
+          <div className="rounded-lg border border-[#c9a227]/20 bg-[#100e08] p-8 text-center"
+               style={{ boxShadow: "0 0 24px rgba(201,162,39,0.08)" }}>
+            <div className="mb-4 text-5xl animate-float">⚔️</div>
+            <p className="font-cinzel text-lg font-bold text-[#c9a227]">Challenge Sent!</p>
+            <p className="mt-2 font-crimson text-sm text-[#7a6845]">
+              Awaiting{" "}
+              <span className="font-semibold text-[#f0e6c8]">{opponentName}</span>
+              &apos;s response...
             </p>
-            <div className="mx-auto mt-4 h-6 w-6 animate-spin rounded-full border-2 border-[#888] border-t-yellow-400" />
+            <div className="mx-auto mt-4 h-6 w-6 spinner-gold" />
           </div>
         )}
 
         {/* Declined */}
         {step === "declined" && (
           <div className="flex flex-col gap-4">
-            <div className="rounded-2xl border border-[#1e1e1e] bg-[#111] p-8 text-center">
-              <div className="mb-3 text-4xl">😞</div>
-              <p className="text-lg font-semibold text-white">Battle declined</p>
-              <p className="mt-1 text-sm text-[#888]">{opponentName} didn&apos;t accept the challenge</p>
+            <div className="medieval-card p-8 text-center">
+              <div className="mb-3 text-4xl">🛡️</div>
+              <p className="font-cinzel text-lg font-semibold text-[#f0e6c8]">Challenge Refused</p>
+              <p className="mt-1 font-crimson text-sm text-[#7a6845]">
+                {opponentName} declined to face you in battle
+              </p>
             </div>
-            <button onClick={() => { setStep("idle"); setError(null); }} className="w-full rounded-2xl bg-white px-8 py-4 text-lg font-bold text-black">
-              Try again
+            <button
+              onClick={() => { setStep("idle"); setError(null); }}
+              className="btn-gold w-full rounded-lg px-8 py-4 text-base"
+            >
+              Seek Another Foe
             </button>
           </div>
         )}
@@ -258,25 +289,34 @@ export const BattleScanner = ({ playerPk, onBack }: Props) => {
         {/* Error */}
         {step === "error" && (
           <div className="flex flex-col gap-4">
-            <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-center">
-              <p className="text-sm text-red-400">{error}</p>
+            <div className="rounded-lg border border-[#8b1a1a]/40 bg-[#8b1a1a]/10 p-5 text-center">
+              <p className="font-crimson text-sm text-[#e04444]">{error}</p>
             </div>
-            <button onClick={() => { setError(null); setStep("idle"); }} className="w-full rounded-2xl bg-white px-8 py-4 text-lg font-bold text-black">
-              Try again
+            <button
+              onClick={() => { setError(null); setStep("idle"); }}
+              className="btn-gold w-full rounded-lg px-8 py-4 text-base"
+            >
+              Try Again
             </button>
           </div>
         )}
 
-        {/* Back */}
+        {/* Back / Cancel */}
         {(step === "idle" || step === "declined" || step === "error") && (
-          <button onClick={() => { stopCamera(); pollingRef.current = false; onBack(); }} className="mt-4 w-full rounded-xl py-3 text-sm text-[#888] hover:text-white">
-            Back to profile
+          <button
+            onClick={() => { stopCamera(); pollingRef.current = false; onBack(); }}
+            className="mt-5 w-full rounded-lg py-3 font-cinzel text-xs tracking-wider text-[#5a4010] hover:text-[#7a6845] transition-colors"
+          >
+            ← Return to Keep
           </button>
         )}
 
         {step === "waiting" && (
-          <button onClick={() => { pollingRef.current = false; setStep("idle"); }} className="mt-4 w-full rounded-xl py-3 text-sm text-[#888] hover:text-white">
-            Cancel
+          <button
+            onClick={() => { pollingRef.current = false; setStep("idle"); }}
+            className="mt-5 w-full rounded-lg py-3 font-cinzel text-xs tracking-wider text-[#5a4010] hover:text-[#7a6845] transition-colors"
+          >
+            Withdraw Challenge
           </button>
         )}
       </div>

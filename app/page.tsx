@@ -247,7 +247,12 @@ export default function Home() {
   }
 
   if (view === "not-registered") {
-    return <NotRegistered onBack={() => setView("welcome")} />;
+    return (
+      <NotRegistered
+        onBack={() => setView("welcome")}
+        onSignup={() => setView("scan-signup")}
+      />
+    );
   }
 
   if (view === "username" && scanData) {
