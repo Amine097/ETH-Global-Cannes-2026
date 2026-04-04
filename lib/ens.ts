@@ -218,6 +218,57 @@ export async function updateTextRecords(
   }
 }
 
+// ── Global ranking stored as encrypted text record on the parent name ──
+
+const RANKING_KEY = "ranking";
+
+export async function writeRankingToEns(
+  positions: Record<string, number>,
+  total: number
+): Promise<void> {
+  const { wallet, pub } = getClients();
+  const account = wallet.account!;
+  const parentNode = namehash(PARENT_NAME);
+
+  const payload = JSON.stringify({ _total: total, ...positions });
+  const encrypted = encrypt(payload);
+
+  const hash = await wallet.writeContract({
+    address: RESOLVER,
+    abi: resolverAbi,
+    functionName: "setText",
+    args: [parentNode, RANKING_KEY, encrypted],
+    chain: sepolia,
+    account,
+  });
+  await pub.waitForTransactionReceipt({ hash });
+}
+
+export async function readRankingFromEns(): Promise<{
+  positions: Record<string, number>;
+  total: number;
+} | null> {
+  const { pub } = getClients();
+  const parentNode = namehash(PARENT_NAME);
+
+  try {
+    const val = await pub.readContract({
+      address: RESOLVER,
+      abi: resolverAbi,
+      functionName: "text",
+      args: [parentNode, RANKING_KEY],
+    });
+    if (!val) return null;
+
+    const data = JSON.parse(decrypt(val)) as Record<string, number>;
+    const total = data._total ?? 0;
+    const { _total, ...positions } = data;
+    return { positions, total };
+  } catch {
+    return null;
+  }
+}
+
 // ── Helper: build ProfileRecords from store data ──
 
 export function toProfileRecords(data: {

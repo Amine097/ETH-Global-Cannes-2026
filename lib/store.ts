@@ -176,6 +176,12 @@ export function setUsername(publicKey: string, username: string): Binding | null
   return profileToBinding(p);
 }
 
+// ── All profiles (for ranking) ──
+
+export function getAllProfiles(): PlayerProfile[] {
+  return Object.values(loadPlayers());
+}
+
 // ── Profile reads ──
 
 // Sync read from JSON (used internally for fast writes like battle resolution)

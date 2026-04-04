@@ -6,6 +6,7 @@ import {
   respondBattle,
   resolveBattle,
 } from "@/lib/battle";
+import { computeAndSyncRanking } from "@/lib/ranking";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -57,6 +58,10 @@ export async function POST(req: NextRequest) {
     if (!battle) {
       return NextResponse.json({ error: "Battle not found or not accepted" }, { status: 404 });
     }
+    // Recompute and persist ranking on ENS after each battle (fire-and-forget)
+    computeAndSyncRanking().catch((err) =>
+      console.error("[Ranking] Failed to sync to ENS:", err)
+    );
     return NextResponse.json({ battle });
   }
 

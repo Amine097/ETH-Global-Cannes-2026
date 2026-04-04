@@ -42,6 +42,8 @@ interface ProfileData {
   level: number;
   rank: string;
   skinIndex: number;
+  position: number | null;
+  total: number | null;
 }
 
 interface Props {
@@ -61,18 +63,23 @@ function xpForLevel(level: number): number {
 
 export const PlayerProfile = ({ etherAddress, publicKey, username, walletAddress, onBattle, onConnectWallet, onLogout }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [profile, setProfile] = useState<ProfileData>({ xp: 0, level: 1, rank: "bronze", skinIndex: 1 });
+  const [profile, setProfile] = useState<ProfileData>({ xp: 0, level: 1, rank: "bronze", skinIndex: 1, position: null, total: null });
 
   const fetchProfile = useCallback(() => {
-    fetch(`/api/players/check?pk=${encodeURIComponent(publicKey)}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.player) {
+    const pkParam = encodeURIComponent(publicKey);
+    Promise.all([
+      fetch(`/api/players/check?pk=${pkParam}`).then((r) => r.json()),
+      fetch(`/api/players/rank?pk=${pkParam}`).then((r) => r.json()),
+    ])
+      .then(([check, rankData]) => {
+        if (check.player) {
           setProfile({
-            xp: data.player.xp ?? 0,
-            level: data.player.level ?? 1,
-            rank: data.player.rank ?? "bronze",
-            skinIndex: data.player.skinIndex ?? 1,
+            xp: check.player.xp ?? 0,
+            level: check.player.level ?? 1,
+            rank: check.player.rank ?? "bronze",
+            skinIndex: check.player.skinIndex ?? 1,
+            position: rankData.position ?? null,
+            total: rankData.total ?? null,
           });
         }
       })
@@ -132,6 +139,19 @@ export const PlayerProfile = ({ etherAddress, publicKey, username, walletAddress
               {rankLabel}
             </span>
           </div>
+
+          {/* Global position */}
+          {profile.position !== null && profile.total !== null && (
+            <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[#c9a227]/20 bg-[#100e08] px-4 py-1">
+              <span className="text-xs">🏰</span>
+              <span className="font-cinzel text-xs tracking-wider text-[#c9a227]">
+                #{profile.position}
+              </span>
+              <span className="font-cinzel text-xs text-[#3d2a10]">
+                of {profile.total}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Level + XP */}
