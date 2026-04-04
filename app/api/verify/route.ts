@@ -1,29 +1,25 @@
-import {
-  verifyCloudProof,
-  IVerifyResponse,
-  ISuccessResult,
-} from "@worldcoin/minikit-js";
 import { NextRequest, NextResponse } from "next/server";
 
-interface IRequestPayload {
-  payload: ISuccessResult;
-  action: string;
-  signal: string | undefined;
-}
+const RP_ID = process.env.WLD_RP_ID ?? "";
 
 export async function POST(req: NextRequest) {
-  const { payload, action, signal } = (await req.json()) as IRequestPayload;
-  const app_id = process.env.APP_ID as `app_${string}`;
-  const verifyRes = (await verifyCloudProof(
-    payload,
-    app_id,
-    action,
-    signal
-  )) as IVerifyResponse;
+  const proof = await req.json();
 
-  if (verifyRes.success) {
-    return NextResponse.json({ verifyRes }, { status: 200 });
+  const res = await fetch(
+    `https://developer.world.org/api/v4/verify/${RP_ID}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(proof),
+    }
+  );
+
+  const result = await res.json();
+
+  if (res.ok) {
+    return NextResponse.json({ success: true, result }, { status: 200 });
   } else {
-    return NextResponse.json({ verifyRes }, { status: 400 });
+    console.error("World ID verify failed:", result);
+    return NextResponse.json({ success: false, result }, { status: 400 });
   }
 }
