@@ -5,6 +5,7 @@ import {
   getBattle,
   respondBattle,
   submitTaps,
+  submitReactions,
   resolveBattle,
 } from "@/lib/battle";
 import { computeAndSyncRanking } from "@/lib/ranking";
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ battle, serverTime: Date.now() });
   }
 
-  // ── Submit tap count after fight ──
+  // ── Submit tap count (taps minigame) ──
   if (action === "submit-taps") {
     const { battleId, role, taps } = body;
     if (!battleId || !role || taps === undefined) {
@@ -62,7 +63,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ battle, serverTime: Date.now() });
   }
 
-  // ── Resolve battle (called after both players submit taps) ──
+  // ── Submit reaction times (reaction minigame) ──
+  if (action === "submit-reactions") {
+    const { battleId, role, reactions } = body;
+    if (!battleId || !role || !Array.isArray(reactions)) {
+      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    }
+    const battle = submitReactions(battleId, role, reactions);
+    if (!battle) {
+      return NextResponse.json({ error: "Battle not found" }, { status: 404 });
+    }
+    return NextResponse.json({ battle, serverTime: Date.now() });
+  }
+
+  // ── Resolve battle ──
   if (action === "resolve") {
     const { battleId } = body;
     if (!battleId) {
@@ -72,7 +86,6 @@ export async function POST(req: NextRequest) {
     if (!battle) {
       return NextResponse.json({ error: "Battle not found or not accepted" }, { status: 404 });
     }
-    // Recompute and persist ranking on ENS after each battle (fire-and-forget)
     computeAndSyncRanking().catch((err) =>
       console.error("[Ranking] Failed to sync to ENS:", err)
     );

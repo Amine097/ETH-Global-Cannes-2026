@@ -7,6 +7,8 @@ export type BattleStatus = "pending" | "accepted" | "declined" | "resolved" | "e
 
 export type BattleMode = "free" | "wager";
 
+export type Minigame = "taps" | "reaction";
+
 export interface BattleFighter {
   publicKey: string;
   username: string;
@@ -19,6 +21,7 @@ export interface BattleFighter {
 export interface Battle {
   id: string;
   mode: BattleMode;
+  minigame?: Minigame;
   wagerAmount?: string; // in ETH, e.g. "0.01"
   attacker: BattleFighter;
   defender: BattleFighter;
@@ -27,8 +30,12 @@ export interface Battle {
   acceptedAt?: number;
   fightStartAt?: number;
   fightEndAt?: number;
+  // Tap spam minigame
   attackerTaps?: number;
   defenderTaps?: number;
+  // Reaction time minigame (3 rounds, ms each)
+  attackerReactions?: number[];
+  defenderReactions?: number[];
   winner?: "attacker" | "defender";
   attackerXpDelta?: number;
   defenderXpDelta?: number;
@@ -55,8 +62,6 @@ const pendingByDefender = g.__pendingByDefender;
 
 // ── XP / Level / Rank math ──
 
-// Level N requires xpForLevel(N) total XP
-// 1→0, 2→100, 3→300, 4→600, 5→1000 ...
 export function xpForLevel(level: number): number {
   if (level <= 1) return 0;
   return level * (level - 1) * 50;
@@ -91,14 +96,12 @@ export function createBattle(
   if (!defender || !defender.username) return { error: "Opponent not found" };
   if (attackerPk.toLowerCase() === defenderPk.toLowerCase()) return { error: "Cannot battle yourself" };
 
-  // Wager battles require both players to have a connected wallet
   if (mode === "wager") {
     if (!attacker.walletAddress) return { error: "You need a connected wallet to wager" };
     if (!defender.walletAddress) return { error: "Opponent has no connected wallet" };
     if (!wagerAmount || parseFloat(wagerAmount) <= 0) return { error: "Invalid wager amount" };
   }
 
-  // Check if defender already has a pending battle
   const existing = pendingByDefender.get(defenderPk.toLowerCase());
   if (existing) {
     const b = battles.get(existing);
@@ -148,7 +151,6 @@ export function getPendingBattle(playerPk: string): Battle | null {
     pendingByDefender.delete(playerPk.toLowerCase());
     return null;
   }
-  // Expire after 60s
   if (Date.now() - b.createdAt > 60_000) {
     b.status = "expired";
     pendingByDefender.delete(playerPk.toLowerCase());
@@ -171,8 +173,12 @@ export function respondBattle(battleId: string, accept: boolean): Battle | null 
   if (accept) {
     const now = Date.now();
     b.acceptedAt = now;
-    b.fightStartAt = now + 6000;  // 6s from now (5s countdown + 1s buffer)
-    b.fightEndAt = now + 16000;   // 10s fight after the start
+    // Randomly pick minigame
+    b.minigame = Math.random() < 0.5 ? "taps" : "reaction";
+    // For taps: 6s countdown + 10s fight
+    // For reaction: 6s countdown then players play 3 rounds (~15s total, no fixed end)
+    b.fightStartAt = now + 6000;
+    b.fightEndAt = b.minigame === "taps" ? now + 16000 : undefined;
   }
 
   return b;
@@ -191,6 +197,19 @@ export function submitTaps(battleId: string, playerRole: "attacker" | "defender"
   return b;
 }
 
+export function submitReactions(battleId: string, playerRole: "attacker" | "defender", reactions: number[]): Battle | null {
+  const b = battles.get(battleId);
+  if (!b || b.status !== "accepted") return null;
+
+  if (playerRole === "attacker") {
+    b.attackerReactions = reactions;
+  } else {
+    b.defenderReactions = reactions;
+  }
+
+  return b;
+}
+
 export function resolveBattle(battleId: string): Battle | null {
   const b = battles.get(battleId);
   if (!b || b.status !== "accepted") return null;
@@ -199,26 +218,38 @@ export function resolveBattle(battleId: string): Battle | null {
   const dLevel = b.defender.level;
   const levelDiff = aLevel - dLevel;
 
-  // ── Win probability ──
   // 1) Level factor: ±5% per level difference
   const levelBonus = levelDiff * 0.05;
 
-  // 2) Tap factor: proportional to the gap between players, up to ±20%
-  //    Formula: (aTaps - dTaps) / (aTaps + dTaps) gives a ratio from -1 to +1
-  //    Multiply by 0.20 so max tap bonus is ±20%
-  //    Equal taps = 0 bonus, small gap = small bonus, huge gap = big bonus
-  const aTaps = b.attackerTaps ?? 0;
-  const dTaps = b.defenderTaps ?? 0;
-  const totalTaps = aTaps + dTaps;
-  const tapBonus = totalTaps > 0 ? ((aTaps - dTaps) / totalTaps) * 0.20 : 0;
+  // 2) Minigame factor
+  let minigameBonus = 0;
 
-  let winChance = 0.5 + levelBonus + tapBonus;
+  if (b.minigame === "taps") {
+    // Tap spam: proportional bonus up to ±20%
+    const aTaps = b.attackerTaps ?? 0;
+    const dTaps = b.defenderTaps ?? 0;
+    const totalTaps = aTaps + dTaps;
+    minigameBonus = totalTaps > 0 ? ((aTaps - dTaps) / totalTaps) * 0.20 : 0;
+  } else if (b.minigame === "reaction") {
+    // Reaction time: compare round by round, each round won = +5% (max ±15%)
+    const aR = b.attackerReactions ?? [999, 999, 999];
+    const dR = b.defenderReactions ?? [999, 999, 999];
+    let attackerRoundsWon = 0;
+    let defenderRoundsWon = 0;
+    for (let i = 0; i < 3; i++) {
+      const aTime = aR[i] ?? 999;
+      const dTime = dR[i] ?? 999;
+      if (aTime < dTime) attackerRoundsWon++;
+      else if (dTime < aTime) defenderRoundsWon++;
+    }
+    // Net rounds: positive = attacker advantage
+    minigameBonus = (attackerRoundsWon - defenderRoundsWon) * 0.05;
+  }
 
-  // Clamp to [10%, 90%] — always fair, nobody is guaranteed a win
+  let winChance = 0.5 + levelBonus + minigameBonus;
   winChance = Math.min(0.90, Math.max(0.10, winChance));
 
   const attackerWins = Math.random() < winChance;
-
   b.winner = attackerWins ? "attacker" : "defender";
 
   // XP calculation
@@ -229,20 +260,17 @@ export function resolveBattle(battleId: string): Battle | null {
   let loserLoss: number;
 
   if (attackerWins) {
-    // Attacker won — bonus if defender was higher level
     winnerGain = Math.max(10, baseXp + (dLevel > aLevel ? gap * 20 : -gap * 10));
     loserLoss = Math.floor(winnerGain * 0.5);
     b.attackerXpDelta = winnerGain;
     b.defenderXpDelta = -loserLoss;
   } else {
-    // Defender won — bonus if attacker was higher level
     winnerGain = Math.max(10, baseXp + (aLevel > dLevel ? gap * 20 : -gap * 10));
     loserLoss = Math.floor(winnerGain * 0.5);
     b.defenderXpDelta = winnerGain;
     b.attackerXpDelta = -loserLoss;
   }
 
-  // Apply XP to profiles
   const aProfile = getProfile(b.attacker.publicKey);
   const dProfile = getProfile(b.defender.publicKey);
 
