@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arena Fighters - 1v1 Battle</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- Left Panel: Player Stats (compact) -->
+    <aside class="left-panel fighter-panel">
+      <div class="brand">ARENA<span>FIGHTERS</span></div>
+
+      <div class="hero-info">
+        <div class="hero-title" id="playerTitle">-</div>
+        <div class="hero-subtitle" id="playerSubtitle">-</div>
+        <div class="hero-grade">
+          <span class="grade-stars" id="playerStars"></span>
+          <span class="grade-label" id="playerGradeLabel">-</span>
+        </div>
+      </div>
+
+      <div class="power-display compact">
+        <div class="power-icon">&#9876;</div>
+        <div class="power-value" id="playerPower">0</div>
+        <div class="power-label">POWER</div>
+      </div>
+
+      <div class="stats-grid" id="playerStats"></div>
+
+      <div class="action-buttons">
+        <button class="action-btn attack-btn" id="attackBtn">&#9876; Attack</button>
+        <button class="action-btn skill-btn" id="skillBtn" disabled>&#10040; Skill</button>
+        <button class="action-btn dodge-btn" id="dodgeBtn">&#10072; Dodge</button>
+      </div>
+    </aside>
+
+    <!-- Center: 3D Battle Scene -->
+    <main class="center-scene">
+      <div class="scene-container">
+        <video id="arenaVideo" autoplay muted playsinline preload="auto">
+          <source src="arena.mp4" type="video/mp4">
+        </video>
+        <div class="arena-watermark-cover"></div>
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Battle HUD overlay -->
+        <div class="battle-hud">
+          <div class="hud-side hud-player">
+            <div class="hud-name" id="hudPlayerName">Player</div>
+            <div class="hp-bar-container">
+              <div class="hp-bar hp-bar-player" id="playerHpBar"></div>
+            </div>
+            <div class="gauge-bar-container">
+              <div class="gauge-label">SKILL</div>
+              <div class="gauge-bar gauge-bar-player" id="playerGaugeBar"></div>
+            </div>
+          </div>
+
+          <div class="vs-badge">VS</div>
+
+          <div class="hud-side hud-opponent">
+            <div class="hud-name" id="hudOpponentName">Opponent</div>
+            <div class="hp-bar-container">
+              <div class="hp-bar hp-bar-opponent" id="opponentHpBar"></div>
+            </div>
+            <div class="gauge-bar-container">
+              <div class="gauge-label">SKILL</div>
+              <div class="gauge-bar gauge-bar-opponent" id="opponentGaugeBar"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Opponent name + level badge (top right of arena) -->
+        <div class="opponent-badge" id="opponentBadge">
+          <div class="opp-name" id="oppBadgeName">???</div>
+          <div class="opp-level" id="oppBadgeLevel">Lv. ??</div>
+        </div>
+      </div>
+
+      <!-- Screen FX overlays -->
+      <div class="screen-flash" id="screenFlash"></div>
+      <div class="evo-text-overlay" id="evoTextOverlay">
+        <div class="evo-text-inner">EVOLUTION!</div>
+      </div>
+      <div class="screen-vignette" id="screenVignette"></div>
+    </main>
+
+    <!-- Hidden elements for JS compatibility -->
+    <div style="display:none">
+      <span id="opponentTitle"></span>
+      <span id="opponentSubtitle"></span>
+      <span id="opponentStars"></span>
+      <span id="opponentGradeLabel"></span>
+      <span id="opponentPower">0</span>
+      <div id="opponentStats"></div>
+    </div>
+  </div>
+
+  <!-- Three.js + GLTFLoader -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
