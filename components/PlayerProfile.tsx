@@ -209,11 +209,19 @@ export const PlayerProfile = ({ etherAddress, publicKey, username, walletAddress
             <span className="font-crimson text-[10px] text-[#7a6845]">via Dynamic</span>
           </div>
           {walletAddress ? (
-            <div className="rounded-lg border border-[#c9a227]/20 bg-[#c9a227]/5 px-3 py-2">
-              <p className="font-mono text-xs text-[#c9a227]">
-                {walletAddress.slice(0, 8)}…{walletAddress.slice(-6)}
-              </p>
-              <p className="mt-1 font-crimson text-[10px] text-[#7a6845]">Ready for wager battles</p>
+            <div>
+              <div className="rounded-lg border border-[#c9a227]/20 bg-[#c9a227]/5 px-3 py-2">
+                <p className="font-mono text-xs text-[#c9a227]">
+                  {walletAddress.slice(0, 8)}…{walletAddress.slice(-6)}
+                </p>
+                <p className="mt-1 font-crimson text-[10px] text-[#7a6845]">Ready for wager battles</p>
+              </div>
+              <button
+                onClick={onConnectWallet}
+                className="mt-2 w-full rounded-lg py-2 font-cinzel text-[10px] tracking-wider text-[#5a4010] hover:text-[#c9a227] transition-colors"
+              >
+                Change Wallet
+              </button>
             </div>
           ) : (
             <button

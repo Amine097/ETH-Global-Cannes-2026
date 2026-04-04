@@ -94,7 +94,7 @@ export const BattleInvite = ({
                style={{ textShadow: "0 0 15px rgba(201,162,39,0.4)" }}>
               {wagerAmount} ETH
             </p>
-            <p className="mt-1 font-crimson text-[10px] text-[#7a6845]">Winner takes all · Powered by Dynamic</p>
+            <p className="mt-1 font-crimson text-[10px] text-[#7a6845]">Winner takes 95% · 5% platform fee · Powered by Dynamic</p>
           </div>
         )}
 

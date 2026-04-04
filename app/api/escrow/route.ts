@@ -90,14 +90,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Winner has no wallet" }, { status: 400 });
     }
 
-    // Total pot = 2x wager
+    // Total pot = 2x wager, minus 5% platform fee
     const wager = parseFloat(battle.wagerAmount ?? "0");
-    const totalPot = (wager * 2).toString();
+    const totalPot = wager * 2;
+    const platformFee = totalPot * 0.05;
+    const winnerPayout = (totalPot - platformFee).toFixed(6);
 
     try {
-      const { txHash } = await sendPayout(winner.walletAddress, totalPot);
+      const { txHash } = await sendPayout(winner.walletAddress, winnerPayout);
       battle.payoutTx = txHash;
-      return NextResponse.json({ success: true, txHash, amount: totalPot });
+      return NextResponse.json({
+        success: true,
+        txHash,
+        totalPot: totalPot.toFixed(6),
+        platformFee: platformFee.toFixed(6),
+        winnerPayout,
+      });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Payout failed";
       console.error("[Escrow] Payout failed:", msg);

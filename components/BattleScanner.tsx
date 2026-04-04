@@ -40,7 +40,6 @@ export const BattleScanner = ({ playerPk, hasWallet, onConnectWallet, onBack }: 
   const scanningRef = useRef(false);
   const pollingRef = useRef(false);
   // Pre-load jsqr once so it's ready synchronously during scan frames
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const jsQrRef = useRef<((data: Uint8ClampedArray, width: number, height: number) => { data: string } | null) | null>(null);
 
   function stopCamera() {
@@ -300,6 +299,9 @@ export const BattleScanner = ({ playerPk, hasWallet, onConnectWallet, onBack }: 
                 </button>
               ))}
             </div>
+            <p className="mt-2 text-center font-crimson text-[10px] text-[#7a6845]">
+              Winner takes 95% of the pot · 5% platform fee
+            </p>
             <button onClick={confirmBet} className="btn-gold mt-2 w-full rounded-lg px-8 py-4 text-base">
               Confirm Wager — {betAmount} ETH
             </button>
@@ -320,7 +322,7 @@ export const BattleScanner = ({ playerPk, hasWallet, onConnectWallet, onBack }: 
                 <p className="font-cinzel text-xs tracking-wider text-[#c9a227]">
                   💰 Wager: {betAmount} ETH
                 </p>
-                <p className="mt-1 font-crimson text-[10px] text-[#7a6845]">Powered by Dynamic</p>
+                <p className="mt-1 font-crimson text-[10px] text-[#7a6845]">5% fee · Powered by Dynamic</p>
               </div>
             )}
             <button onClick={startNfcScan} className="btn-gold w-full rounded-lg px-8 py-4 text-base">
