@@ -4,6 +4,7 @@ import {
   getPendingBattle,
   getBattle,
   respondBattle,
+  submitTaps,
   resolveBattle,
 } from "@/lib/battle";
 import { computeAndSyncRanking } from "@/lib/ranking";
@@ -45,10 +46,23 @@ export async function POST(req: NextRequest) {
     if (!battle) {
       return NextResponse.json({ error: "Battle not found or already responded" }, { status: 404 });
     }
-    return NextResponse.json({ battle });
+    return NextResponse.json({ battle, serverTime: Date.now() });
   }
 
-  // ── Resolve battle (called after countdown) ��─
+  // ── Submit tap count after fight ──
+  if (action === "submit-taps") {
+    const { battleId, role, taps } = body;
+    if (!battleId || !role || taps === undefined) {
+      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    }
+    const battle = submitTaps(battleId, role, taps);
+    if (!battle) {
+      return NextResponse.json({ error: "Battle not found" }, { status: 404 });
+    }
+    return NextResponse.json({ battle, serverTime: Date.now() });
+  }
+
+  // ── Resolve battle (called after both players submit taps) ──
   if (action === "resolve") {
     const { battleId } = body;
     if (!battleId) {
@@ -72,7 +86,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing battleId" }, { status: 400 });
     }
     const battle = getBattle(battleId);
-    return NextResponse.json({ battle: battle ?? null });
+    return NextResponse.json({ battle: battle ?? null, serverTime: Date.now() });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });

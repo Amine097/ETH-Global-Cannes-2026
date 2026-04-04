@@ -24,6 +24,11 @@ export interface Battle {
   defender: BattleFighter;
   status: BattleStatus;
   createdAt: number;
+  acceptedAt?: number;
+  fightStartAt?: number;
+  fightEndAt?: number;
+  attackerTaps?: number;
+  defenderTaps?: number;
   winner?: "attacker" | "defender";
   attackerXpDelta?: number;
   defenderXpDelta?: number;
@@ -163,6 +168,26 @@ export function respondBattle(battleId: string, accept: boolean): Battle | null 
   b.status = accept ? "accepted" : "declined";
   pendingByDefender.delete(b.defender.publicKey.toLowerCase());
 
+  if (accept) {
+    const now = Date.now();
+    b.acceptedAt = now;
+    b.fightStartAt = now + 6000;  // 6s from now (5s countdown + 1s buffer)
+    b.fightEndAt = now + 16000;   // 10s fight after the start
+  }
+
+  return b;
+}
+
+export function submitTaps(battleId: string, playerRole: "attacker" | "defender", taps: number): Battle | null {
+  const b = battles.get(battleId);
+  if (!b || b.status !== "accepted") return null;
+
+  if (playerRole === "attacker") {
+    b.attackerTaps = taps;
+  } else {
+    b.defenderTaps = taps;
+  }
+
   return b;
 }
 
@@ -174,8 +199,24 @@ export function resolveBattle(battleId: string): Battle | null {
   const dLevel = b.defender.level;
   const levelDiff = aLevel - dLevel;
 
-  // Win probability: 50% base, ±5% per level diff, clamped [15%, 85%]
-  const winChance = Math.min(0.85, Math.max(0.15, 0.5 + levelDiff * 0.05));
+  // ── Win probability ──
+  // 1) Level factor: ±5% per level difference
+  const levelBonus = levelDiff * 0.05;
+
+  // 2) Tap factor: proportional to the gap between players, up to ±20%
+  //    Formula: (aTaps - dTaps) / (aTaps + dTaps) gives a ratio from -1 to +1
+  //    Multiply by 0.20 so max tap bonus is ±20%
+  //    Equal taps = 0 bonus, small gap = small bonus, huge gap = big bonus
+  const aTaps = b.attackerTaps ?? 0;
+  const dTaps = b.defenderTaps ?? 0;
+  const totalTaps = aTaps + dTaps;
+  const tapBonus = totalTaps > 0 ? ((aTaps - dTaps) / totalTaps) * 0.20 : 0;
+
+  let winChance = 0.5 + levelBonus + tapBonus;
+
+  // Clamp to [10%, 90%] — always fair, nobody is guaranteed a win
+  winChance = Math.min(0.90, Math.max(0.10, winChance));
+
   const attackerWins = Math.random() < winChance;
 
   b.winner = attackerWins ? "attacker" : "defender";
