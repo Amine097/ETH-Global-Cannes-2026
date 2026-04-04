@@ -6,6 +6,7 @@ import {
   respondBattle,
   submitTaps,
   submitReactions,
+  submitRhythm,
   resolveBattle,
 } from "@/lib/battle";
 import { computeAndSyncRanking } from "@/lib/ranking";
@@ -70,6 +71,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
     const battle = submitReactions(battleId, role, reactions);
+    if (!battle) {
+      return NextResponse.json({ error: "Battle not found" }, { status: 404 });
+    }
+    return NextResponse.json({ battle, serverTime: Date.now() });
+  }
+
+  // ── Submit rhythm score ──
+  if (action === "submit-rhythm") {
+    const { battleId, role, score } = body;
+    if (!battleId || !role || score === undefined) {
+      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    }
+    const battle = submitRhythm(battleId, role, score);
     if (!battle) {
       return NextResponse.json({ error: "Battle not found" }, { status: 404 });
     }

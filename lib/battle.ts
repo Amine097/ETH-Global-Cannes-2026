@@ -7,7 +7,7 @@ export type BattleStatus = "pending" | "accepted" | "declined" | "resolved" | "e
 
 export type BattleMode = "free" | "wager";
 
-export type Minigame = "taps" | "reaction";
+export type Minigame = "taps" | "reaction" | "rhythm";
 
 export interface BattleFighter {
   publicKey: string;
@@ -36,6 +36,9 @@ export interface Battle {
   // Reaction time minigame (3 rounds, ms each)
   attackerReactions?: number[];
   defenderReactions?: number[];
+  // Rhythm minigame (total score, max 800)
+  attackerRhythm?: number;
+  defenderRhythm?: number;
   winner?: "attacker" | "defender";
   attackerXpDelta?: number;
   defenderXpDelta?: number;
@@ -173,11 +176,11 @@ export function respondBattle(battleId: string, accept: boolean): Battle | null 
   if (accept) {
     const now = Date.now();
     b.acceptedAt = now;
-    // Randomly pick minigame
-    b.minigame = Math.random() < 0.5 ? "taps" : "reaction";
-    // For taps: 6s countdown + 10s fight
-    // For reaction: 6s countdown then players play 3 rounds (~15s total, no fixed end)
+    // Randomly pick minigame (1/3 each)
+    const roll = Math.random();
+    b.minigame = roll < 0.33 ? "taps" : roll < 0.66 ? "reaction" : "rhythm";
     b.fightStartAt = now + 6000;
+    // Only taps has a fixed end timer
     b.fightEndAt = b.minigame === "taps" ? now + 16000 : undefined;
   }
 
@@ -205,6 +208,19 @@ export function submitReactions(battleId: string, playerRole: "attacker" | "defe
     b.attackerReactions = reactions;
   } else {
     b.defenderReactions = reactions;
+  }
+
+  return b;
+}
+
+export function submitRhythm(battleId: string, playerRole: "attacker" | "defender", score: number): Battle | null {
+  const b = battles.get(battleId);
+  if (!b || b.status !== "accepted") return null;
+
+  if (playerRole === "attacker") {
+    b.attackerRhythm = score;
+  } else {
+    b.defenderRhythm = score;
   }
 
   return b;
@@ -244,6 +260,12 @@ export function resolveBattle(battleId: string): Battle | null {
     }
     // Net rounds: positive = attacker advantage
     minigameBonus = (attackerRoundsWon - defenderRoundsWon) * 0.05;
+  } else if (b.minigame === "rhythm") {
+    // Rhythm: proportional bonus based on score difference, up to ±18%
+    const aScore = b.attackerRhythm ?? 0;
+    const dScore = b.defenderRhythm ?? 0;
+    const totalScore = aScore + dScore;
+    minigameBonus = totalScore > 0 ? ((aScore - dScore) / totalScore) * 0.18 : 0;
   }
 
   let winChance = 0.5 + levelBonus + minigameBonus;

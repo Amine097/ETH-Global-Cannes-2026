@@ -24,6 +24,7 @@ const RANK_COLORS: Record<string, string> = {
 const MINIGAME_NAMES: Record<Minigame, string> = {
   taps: "Tap Frenzy",
   reaction: "Lightning Reflexes",
+  rhythm: "Battle Rhythm",
 };
 
 type Phase = "deposit" | "waiting-deposits" | "syncing" | "countdown" | "fighting" | "submitting" | "resolving" | "result";
@@ -41,6 +42,7 @@ export const BattleArena = ({ battleId, playerPk, role, onDone }: Props) => {
   const [fightRemaining, setFightRemaining] = useState(10);
   const [taps, setTaps] = useState(0);
   const [reactionTimes, setReactionTimes] = useState<number[]>([]);
+  const [rhythmScore, setRhythmScore] = useState(0);
   const [depositStatus, setDepositStatus] = useState<string | null>(null);
   const [escrowAddress, setEscrowAddress] = useState<string | null>(null);
   const depositPollingRef = useRef(false);
@@ -49,6 +51,7 @@ export const BattleArena = ({ battleId, playerPk, role, onDone }: Props) => {
   const resolved = useRef(false);
   const tapsRef = useRef(0);
   const reactionTimesRef = useRef<number[]>([]);
+  const rhythmScoreRef = useRef(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const timersRef = useRef<{ fightStart: number; fightEnd: number }>({ fightStart: 0, fightEnd: 0 });
 
@@ -256,20 +259,29 @@ export const BattleArena = ({ battleId, playerPk, role, onDone }: Props) => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "submit-taps", battleId, role, taps: tapsRef.current }),
         });
-      } else {
+      } else if (minigame === "reaction") {
         await fetch("/api/battle", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "submit-reactions", battleId, role, reactions: reactionTimesRef.current }),
+        });
+      } else if (minigame === "rhythm") {
+        await fetch("/api/battle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "submit-rhythm", battleId, role, score: rhythmScoreRef.current }),
         });
       }
 
       if (cancelled) return;
 
       // Check which field to wait for from opponent
-      const opponentField = role === "attacker"
-        ? (minigame === "taps" ? "defenderTaps" : "defenderReactions")
-        : (minigame === "taps" ? "attackerTaps" : "attackerReactions");
+      const fieldMap: Record<string, [string, string]> = {
+        taps: ["defenderTaps", "attackerTaps"],
+        reaction: ["defenderReactions", "attackerReactions"],
+        rhythm: ["defenderRhythm", "attackerRhythm"],
+      };
+      const opponentField = (fieldMap[minigame] ?? fieldMap.taps)[role === "attacker" ? 0 : 1];
 
       if (role === "attacker") {
         // Wait for opponent data then resolve
@@ -358,6 +370,13 @@ export const BattleArena = ({ battleId, playerPk, role, onDone }: Props) => {
     setPhase("submitting");
   }, []);
 
+  // Rhythm game complete handler
+  const handleRhythmDone = useCallback((score: number) => {
+    rhythmScoreRef.current = score;
+    setRhythmScore(score);
+    setPhase("submitting");
+  }, []);
+
   const me = battle ? (role === "attacker" ? battle.attacker : battle.defender) : null;
   const opponent = battle ? (role === "attacker" ? battle.defender : battle.attacker) : null;
   const iWon = battle?.winner === role;
@@ -370,6 +389,8 @@ export const BattleArena = ({ battleId, playerPk, role, onDone }: Props) => {
   const wonSpam = (myTaps ?? 0) > (oppTaps ?? 0);
   const myReactions = role === "attacker" ? battle?.attackerReactions : battle?.defenderReactions;
   const oppReactions = role === "attacker" ? battle?.defenderReactions : battle?.attackerReactions;
+  const myRhythm = role === "attacker" ? battle?.attackerRhythm : battle?.defenderRhythm;
+  const oppRhythm = role === "attacker" ? battle?.defenderRhythm : battle?.attackerRhythm;
 
   return (
     <>
@@ -493,15 +514,22 @@ export const BattleArena = ({ battleId, playerPk, role, onDone }: Props) => {
             </div>
 
             <div className="mt-6 space-y-2 text-center">
-              {minigame === "taps" ? (
+              {minigame === "taps" && (
                 <>
                   <p className="font-cinzel text-xs tracking-[0.3em] text-[#c9a227] uppercase">Tap the screen as fast as you can!</p>
                   <p className="font-crimson text-sm text-[#7a6845]">Out-tap your foe to gain favor from the gods</p>
                 </>
-              ) : (
+              )}
+              {minigame === "reaction" && (
                 <>
                   <p className="font-cinzel text-xs tracking-[0.3em] text-[#c9a227] uppercase">Wait for the signal, then tap instantly!</p>
                   <p className="font-crimson text-sm text-[#7a6845]">3 rounds — win more rounds, gain more favor</p>
+                </>
+              )}
+              {minigame === "rhythm" && (
+                <>
+                  <p className="font-cinzel text-xs tracking-[0.3em] text-[#c9a227] uppercase">Tap in sync with the rhythm!</p>
+                  <p className="font-crimson text-sm text-[#7a6845]">8 beats — tap when the ring hits the circle</p>
                 </>
               )}
             </div>
@@ -538,6 +566,11 @@ export const BattleArena = ({ battleId, playerPk, role, onDone }: Props) => {
         <ReactionGame onDone={handleReactionDone} videoRef={videoRef} />
       )}
 
+      {/* ── Fighting: Rhythm Minigame ── */}
+      {phase === "fighting" && minigame === "rhythm" && (
+        <RhythmGame onDone={handleRhythmDone} videoRef={videoRef} />
+      )}
+
       {/* ── Submitting / Resolving ── */}
       {(phase === "submitting" || phase === "resolving") && (
         <div className="realm-bg flex min-h-screen flex-col items-center justify-center px-6">
@@ -550,6 +583,11 @@ export const BattleArena = ({ battleId, playerPk, role, onDone }: Props) => {
             {minigame === "reaction" && reactionTimes.length > 0 && (
               <p className="mb-2 font-cinzel text-lg font-bold text-[#c9a227]">
                 Avg {Math.round(reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length)}ms
+              </p>
+            )}
+            {minigame === "rhythm" && (
+              <p className="mb-2 font-cinzel text-lg font-bold text-[#c9a227]">
+                {rhythmScoreRef.current} / 800 pts
               </p>
             )}
             <div className="mx-auto mb-4 h-10 w-10 spinner-gold" />
@@ -655,6 +693,30 @@ export const BattleArena = ({ battleId, playerPk, role, onDone }: Props) => {
                   );
                   return null;
                 })()}
+              </div>
+            )}
+
+            {/* Rhythm results */}
+            {minigame === "rhythm" && myRhythm !== undefined && oppRhythm !== undefined && (
+              <div className="medieval-card mb-4 p-4">
+                <p className="mb-3 text-center font-cinzel text-[10px] tracking-[0.3em] text-[#5a4010] uppercase">Rhythm Score</p>
+                <div className="flex items-center justify-around">
+                  <div className="text-center">
+                    <p className="font-cinzel text-2xl font-black text-[#c9a227]">{myRhythm}</p>
+                    <p className="font-cinzel text-[10px] text-[#5a4010] uppercase">You</p>
+                  </div>
+                  <span className="font-cinzel text-sm text-[#3d2a10]">vs</span>
+                  <div className="text-center">
+                    <p className="font-cinzel text-2xl font-black text-[#f0e6c8]">{oppRhythm}</p>
+                    <p className="font-cinzel text-[10px] text-[#5a4010] uppercase">Foe</p>
+                  </div>
+                </div>
+                <p className="mt-1 text-center font-crimson text-[10px] text-[#5a4010]">out of 800</p>
+                {myRhythm > oppRhythm && (myRhythm + oppRhythm) > 0 && (
+                  <p className="mt-2 text-center font-cinzel text-[10px] tracking-wider text-[#c9a227]">
+                    +{Math.round(((myRhythm - oppRhythm) / (myRhythm + oppRhythm)) * 18)}% favor from the gods
+                  </p>
+                )}
               </div>
             )}
 
@@ -872,6 +934,209 @@ function ReactionGame({ onDone, videoRef }: { onDone: (times: number[]) => void;
             </p>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// Rhythm Minigame Component
+// ═══════════════════════════════════════════════
+
+const BEAT_COUNT = 8;
+const BEAT_INTERVAL = 1250; // ms between beats
+const RING_DURATION = 1000; // ms for ring to shrink to target
+
+function RhythmGame({ onDone, videoRef }: { onDone: (score: number) => void; videoRef: React.RefObject<HTMLVideoElement | null> }) {
+  const [beatIndex, setBeatIndex] = useState(-1); // -1 = not started
+  const [ringProgress, setRingProgress] = useState(0); // 0 to 1
+  const [feedback, setFeedback] = useState<{ text: string; color: string; points: number } | null>(null);
+  const [score, setScore] = useState(0);
+  const [beatResults, setBeatResults] = useState<string[]>([]);
+  const beatStartRef = useRef(0);
+  const tappedRef = useRef(false);
+  const scoreRef = useRef(0);
+  const animFrameRef = useRef(0);
+  const gameStartRef = useRef(0);
+  const resultsRef = useRef<string[]>([]);
+
+  // Start the game
+  useEffect(() => {
+    gameStartRef.current = Date.now() + 500; // small delay
+    setBeatIndex(0);
+  }, []);
+
+  // Run each beat
+  useEffect(() => {
+    if (beatIndex < 0 || beatIndex >= BEAT_COUNT) return;
+    tappedRef.current = false;
+    setFeedback(null);
+
+    // The beat target time
+    const beatTime = gameStartRef.current + beatIndex * BEAT_INTERVAL;
+    const ringStart = beatTime - RING_DURATION;
+    beatStartRef.current = beatTime;
+
+    // Animate ring
+    const animate = () => {
+      const now = Date.now();
+      const progress = Math.min(1, (now - ringStart) / RING_DURATION);
+      setRingProgress(progress);
+
+      if (now < beatTime + 300) {
+        animFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        // Time expired for this beat
+        if (!tappedRef.current) {
+          // Missed
+          setFeedback({ text: "MISS", color: "text-[#e04444]", points: 0 });
+          resultsRef.current = [...resultsRef.current, "miss"];
+          setBeatResults([...resultsRef.current]);
+          setTimeout(() => {
+            if (beatIndex + 1 >= BEAT_COUNT) {
+              onDone(scoreRef.current);
+            } else {
+              setBeatIndex((b) => b + 1);
+            }
+          }, 400);
+        }
+      }
+    };
+
+    // Wait until ring should start
+    const delay = Math.max(0, ringStart - Date.now());
+    const timeout = setTimeout(() => {
+      animFrameRef.current = requestAnimationFrame(animate);
+    }, delay);
+
+    return () => {
+      clearTimeout(timeout);
+      cancelAnimationFrame(animFrameRef.current);
+    };
+  }, [beatIndex, onDone]);
+
+  const handleTap = useCallback(() => {
+    if (videoRef.current?.paused) videoRef.current.play().catch(() => {});
+    if (tappedRef.current || beatIndex < 0 || beatIndex >= BEAT_COUNT) return;
+    tappedRef.current = true;
+
+    const diff = Math.abs(Date.now() - beatStartRef.current);
+    let points: number;
+    let text: string;
+    let color: string;
+    let result: string;
+
+    if (diff < 80) {
+      points = 100; text = "PERFECT"; color = "text-[#c9a227]"; result = "perfect";
+    } else if (diff < 150) {
+      points = 70; text = "GOOD"; color = "text-[#2ecc71]"; result = "good";
+    } else if (diff < 250) {
+      points = 40; text = "OK"; color = "text-[#f39c12]"; result = "ok";
+    } else {
+      points = 0; text = "MISS"; color = "text-[#e04444]"; result = "miss";
+    }
+
+    scoreRef.current += points;
+    setScore(scoreRef.current);
+    setFeedback({ text, color, points });
+    resultsRef.current = [...resultsRef.current, result];
+    setBeatResults([...resultsRef.current]);
+
+    setTimeout(() => {
+      if (beatIndex + 1 >= BEAT_COUNT) {
+        onDone(scoreRef.current);
+      } else {
+        setBeatIndex((b) => b + 1);
+      }
+    }, 400);
+  }, [beatIndex, onDone, videoRef]);
+
+  // Ring scale: starts large (2.5), shrinks to 1 (target size)
+  const ringScale = 1 + (1 - ringProgress) * 1.5;
+  const ringOpacity = ringProgress > 0.3 ? 1 : ringProgress / 0.3;
+
+  return (
+    <div
+      className="fixed top-0 left-0 w-screen z-10 overflow-hidden select-none"
+      style={{ height: "100dvh" }}
+      onPointerDown={handleTap}
+    >
+      <div className="absolute inset-0 bg-black/50 z-[1]" />
+
+      {/* Score */}
+      <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[2]">
+        <div className="rounded-full border border-[#c9a227]/40 bg-black/70 px-5 py-2 backdrop-blur-sm" style={{ boxShadow: "0 0 20px rgba(0,0,0,0.5)" }}>
+          <span className="font-cinzel text-xl font-black text-[#c9a227]" style={{ textShadow: "0 0 12px rgba(201,162,39,0.6)" }}>
+            {score}
+          </span>
+          <span className="font-cinzel text-xs text-[#c9a227]/50 ml-1">/ 800</span>
+        </div>
+      </div>
+
+      {/* Beat progress dots */}
+      <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[2] flex gap-2 mt-2">
+        {Array.from({ length: BEAT_COUNT }).map((_, i) => (
+          <div
+            key={i}
+            className={`h-2.5 w-2.5 rounded-full border ${
+              i < beatResults.length
+                ? beatResults[i] === "perfect"
+                  ? "border-[#c9a227] bg-[#c9a227]"
+                  : beatResults[i] === "good"
+                    ? "border-[#2ecc71] bg-[#2ecc71]"
+                    : beatResults[i] === "ok"
+                      ? "border-[#f39c12] bg-[#f39c12]"
+                      : "border-[#e04444] bg-[#e04444]"
+                : i === beatIndex
+                  ? "border-[#c9a227] bg-[#c9a227]/30"
+                  : "border-[#3d2a10] bg-transparent"
+            }`}
+          />
+        ))}
+      </div>
+
+      {/* Center target + ring */}
+      <div className="absolute inset-0 flex items-center justify-center z-[2] pointer-events-none">
+        <div className="relative flex items-center justify-center">
+          {/* Target circle */}
+          <div
+            className="h-24 w-24 rounded-full border-[3px] border-[#c9a227]/60"
+            style={{ boxShadow: "0 0 30px rgba(201,162,39,0.15), inset 0 0 20px rgba(201,162,39,0.1)" }}
+          />
+
+          {/* Shrinking ring */}
+          {beatIndex >= 0 && beatIndex < BEAT_COUNT && !tappedRef.current && (
+            <div
+              className="absolute h-24 w-24 rounded-full border-4 border-[#c9a227]"
+              style={{
+                transform: `scale(${ringScale})`,
+                opacity: ringOpacity,
+                transition: "none",
+                boxShadow: ringProgress > 0.85 ? "0 0 25px rgba(201,162,39,0.5)" : "none",
+              }}
+            />
+          )}
+
+          {/* Feedback text */}
+          {feedback && (
+            <div className="absolute flex flex-col items-center">
+              <p className={`font-cinzel text-3xl font-black ${feedback.color}`}
+                style={{ textShadow: "0 0 20px rgba(0,0,0,0.8)" }}>
+                {feedback.text}
+              </p>
+              {feedback.points > 0 && (
+                <p className="font-cinzel text-sm text-[#c9a227]/70">+{feedback.points}</p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom instruction */}
+      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[2]">
+        <p className="font-cinzel text-[10px] tracking-[0.3em] text-[#f0e6c8]/40 uppercase">
+          Tap when the ring hits the circle
+        </p>
       </div>
     </div>
   );
