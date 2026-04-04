@@ -23,20 +23,24 @@ export interface PlayerProfile {
 }
 
 // ── JSON file persistence ──
+// Use /tmp on Vercel (serverless, writable), data/ locally
 
-const DATA_DIR = path.join(process.cwd(), "data");
+const IS_VERCEL = !!process.env.VERCEL;
+const DATA_DIR = IS_VERCEL ? "/tmp" : path.join(process.cwd(), "data");
 const PLAYERS_FILE = path.join(DATA_DIR, "players.json");
 
 function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+  } catch { /* read-only fs, ignore */ }
 }
 
 function loadPlayers(): Record<string, PlayerProfile> {
   ensureDataDir();
-  if (!fs.existsSync(PLAYERS_FILE)) return {};
   try {
+    if (!fs.existsSync(PLAYERS_FILE)) return {};
     return JSON.parse(fs.readFileSync(PLAYERS_FILE, "utf-8"));
   } catch {
     return {};
@@ -45,7 +49,9 @@ function loadPlayers(): Record<string, PlayerProfile> {
 
 function savePlayers(players: Record<string, PlayerProfile>) {
   ensureDataDir();
-  fs.writeFileSync(PLAYERS_FILE, JSON.stringify(players, null, 2), "utf-8");
+  try {
+    fs.writeFileSync(PLAYERS_FILE, JSON.stringify(players, null, 2), "utf-8");
+  } catch { /* read-only fs, ignore — ENS is the real storage */ }
 }
 
 // ── ENS sync (fire-and-forget, logs errors) ──
