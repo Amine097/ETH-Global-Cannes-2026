@@ -35,34 +35,44 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Signature verification failed" }, { status: 400 });
   }
 
-  // Check if already registered — local JSON + ENS index
-  const existing = getBindingByPublicKey(publicKey);
-  if (existing?.username) {
-    return NextResponse.json({ success: true, player: existing, alreadyRegistered: true });
+  // ── STRICT CHECK: is this publicKey already registered? ──
+  // Check 1: local JSON cache
+  const existingLocal = getBindingByPublicKey(publicKey);
+  if (existingLocal?.username) {
+    return NextResponse.json({ success: true, player: existingLocal, alreadyRegistered: true });
   }
-  // Also check ENS (Vercel cold start: JSON may be empty)
-  const ensCheck = await isRegistered(publicKey);
-  if (ensCheck.registered && ensCheck.username) {
-    return NextResponse.json({
-      success: true,
-      player: { publicKey: publicKey.toLowerCase(), username: ensCheck.username },
-      alreadyRegistered: true,
-    });
+  // Check 2: ENS player index (authoritative)
+  try {
+    const ensCheck = await isRegistered(publicKey);
+    if (ensCheck.registered && ensCheck.username) {
+      return NextResponse.json({
+        success: true,
+        player: { publicKey: publicKey.toLowerCase(), username: ensCheck.username },
+        alreadyRegistered: true,
+      });
+    }
+  } catch (err) {
+    // ENS check failed — REFUSE registration to be safe (prevent duplicates)
+    console.error("[Register] ENS check failed, refusing registration:", err);
+    return NextResponse.json(
+      { error: "Could not verify identity. Please try again." },
+      { status: 503 }
+    );
   }
 
-  // Validate username
+  // ── Validate username ──
   if (!username) {
     return NextResponse.json({ error: "Username required" }, { status: 400 });
   }
-  const trimmed = username.trim();
+  const trimmed = username.trim().toLowerCase();
   if (trimmed.length < 2 || trimmed.length > 20) {
     return NextResponse.json({ error: "Username must be 2-20 characters" }, { status: 400 });
   }
-  if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
-    return NextResponse.json({ error: "Only letters, numbers, _ and -" }, { status: 400 });
+  if (!/^[a-z0-9_-]+$/.test(trimmed)) {
+    return NextResponse.json({ error: "Only lowercase letters, numbers, _ and -" }, { status: 400 });
   }
 
-  // Check username uniqueness — local JSON + ENS
+  // ── STRICT CHECK: is this username already taken? ──
   const takenLocal = getBindingByUsername(trimmed);
   if (takenLocal) {
     return NextResponse.json({ error: "Username already taken" }, { status: 409 });
@@ -72,9 +82,16 @@ export async function POST(req: NextRequest) {
     if (takenEns) {
       return NextResponse.json({ error: "Username already taken" }, { status: 409 });
     }
-  } catch { /* ENS check failed, proceed — worst case duplicate gets a tx revert */ }
+  } catch (err) {
+    // ENS check failed — REFUSE to be safe
+    console.error("[Register] ENS username check failed:", err);
+    return NextResponse.json(
+      { error: "Could not verify username. Please try again." },
+      { status: 503 }
+    );
+  }
 
-  // Create the player
+  // ── Create the player ──
   const binding = {
     playerId: publicKey.toLowerCase(),
     publicKey: publicKey.toLowerCase(),
@@ -83,8 +100,7 @@ export async function POST(req: NextRequest) {
     linkedAt: new Date(),
   };
   saveBinding(binding);
-  // Note: saveBinding triggers syncToEns which creates the subname + updates the index
-  // No separate updateProfile needed — worldId is set in syncToEns records
+  // saveBinding triggers syncToEns → creates subname + updates player index
 
   return NextResponse.json({ success: true, player: binding, isNew: true }, { status: 201 });
 }

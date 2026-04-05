@@ -1,5 +1,6 @@
 "use client";
 
+// ── DYNAMIC INTEGRATION — Wallet connection provider (lazy-loaded) ──
 import { DynamicContextProvider } from "@dynamic-labs/sdk-react-core";
 import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
 import { ReactNode } from "react";

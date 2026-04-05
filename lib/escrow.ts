@@ -1,3 +1,10 @@
+// ══════════════════════════════════════════════════════════════
+// DYNAMIC / ESCROW — Wager battle crypto escrow on Sepolia
+// Players deposit via Dynamic-connected wallets
+// Server wallet holds deposits + sends 95% payout to winner
+// 5% platform fee retained in escrow wallet
+// ══════════════════════════════════════════════════════════════
+
 import {
   createPublicClient,
   createWalletClient,

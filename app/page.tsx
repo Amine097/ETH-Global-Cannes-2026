@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Welcome } from "@/components/Welcome";
-import { WorldVerify } from "@/components/WorldVerify";
 import { BraceletScan } from "@/components/BraceletScan";
 import { UsernameChooser } from "@/components/UsernameChooser";
 import { PlayerProfile } from "@/components/PlayerProfile";
@@ -11,21 +10,23 @@ import { BattleInvite } from "@/components/BattleInvite";
 import { BattleArena } from "@/components/BattleArena";
 import { WalletConnect } from "@/components/WalletConnect";
 import { WithDynamic } from "@/components/WithDynamic";
+import { Leaderboard } from "@/components/Leaderboard";
 
 // Session expires after 4 hours
 const SESSION_TTL_MS = 4 * 60 * 60 * 1000;
+const ADMIN_PK = "046bae40b1f4fed8ef310b3d526f99d84ee2cf4bfeb999cc2bceb35c49ad42f1911c854d9b41706ba3630e82ffcc1bccc2fb14255bcf6193b872cea9163ffd62ff";
 
 type View =
   | "loading"
   | "welcome"
-  | "verify"
   | "scan"
   | "username"
   | "profile"
   | "wallet-connect"
   | "battle"
   | "battle-invite"
-  | "battle-arena";
+  | "battle-arena"
+  | "leaderboard";
 
 interface PlayerData {
   publicKey: string;
@@ -102,8 +103,6 @@ function loadSession(): PlayerData | null {
 function clearSession() {
   localStorage.removeItem("session");
   localStorage.removeItem("player");
-  localStorage.removeItem("world_verified");
-  localStorage.removeItem("pending_verify");
 }
 
 export default function Home() {
@@ -200,16 +199,6 @@ export default function Home() {
   // ── Auth flow ──
 
   function startAuth() {
-    // World ID verify disabled for now — go straight to scan
-    // localStorage.setItem("pending_verify", "true");
-    // setView("verify");
-    setView("scan");
-  }
-
-  function handleVerified() {
-    localStorage.setItem("world_verified", "true");
-    localStorage.removeItem("pending_verify");
-    if (player) { setView("profile"); return; }
     setView("scan");
   }
 
@@ -291,15 +280,6 @@ export default function Home() {
 
   if (view === "welcome") {
     return <Welcome onEnter={() => startAuth()} />;
-  }
-
-  if (view === "verify") {
-    return (
-      <WorldVerify
-        onVerified={handleVerified}
-        onBack={() => { localStorage.removeItem("pending_verify"); setView("welcome"); }}
-      />
-    );
   }
 
   if (view === "scan") {
@@ -390,7 +370,17 @@ export default function Home() {
     );
   }
 
+  if (view === "leaderboard" && player) {
+    return (
+      <Leaderboard
+        playerPk={player.publicKey}
+        onBack={() => setView("profile")}
+      />
+    );
+  }
+
   if (view === "profile" && player) {
+    const isAdmin = player.publicKey.toLowerCase() === ADMIN_PK.toLowerCase();
     return (
       <PlayerProfile
         etherAddress={player.etherAddress}
@@ -399,6 +389,7 @@ export default function Home() {
         walletAddress={walletAddress}
         onBattle={() => setView("battle")}
         onConnectWallet={handleConnectWallet}
+        onLeaderboard={isAdmin ? () => setView("leaderboard") : undefined}
         onLogout={handleLogout}
       />
     );

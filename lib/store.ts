@@ -6,13 +6,12 @@ import { createSubnameWithProfile, updateTextRecords, readProfile as ensReadProf
 // ── Player profile (ENS-ready: each field maps to a text record) ──
 
 export interface PlayerProfile {
-  // Identity
+  // Identity (stored on ENS as text records)
   publicKey: string;
   etherAddress: string;
   username: string;
-  worldId: "verified" | "";
 
-  // Game
+  // Game (stored encrypted on ENS)
   xp: number;
   level: number;
   rank: string; // bronze, silver, gold, platinum, diamond
@@ -173,8 +172,8 @@ export function saveBinding(binding: Binding): void {
   players[key] = {
     publicKey: binding.publicKey.toLowerCase(),
     etherAddress: binding.etherAddress.toLowerCase(),
-    username: binding.username ?? existing?.username ?? "",
-    worldId: existing?.worldId ?? "",
+    username: (binding.username ?? existing?.username ?? "").toLowerCase(),
+
     xp: existing?.xp ?? 0,
     level: existing?.level ?? 1,
     rank: existing?.rank ?? "bronze",
@@ -261,7 +260,7 @@ export async function getProfileFromEns(publicKey: string): Promise<PlayerProfil
       publicKey: records.publicKey,
       etherAddress: records.etherAddress,
       username,
-      worldId: (records.worldId === "verified" ? "verified" : "") as "verified" | "",
+
       xp: parseInt(records.xp) || 0,
       level: parseInt(records.level) || 1,
       rank: records.rank || "bronze",
@@ -288,13 +287,13 @@ export async function isRegistered(publicKey: string): Promise<{ registered: boo
   return { registered: false };
 }
 
-export function updateProfile(publicKey: string, updates: Partial<Pick<PlayerProfile, "worldId" | "xp" | "level" | "rank" | "skinIndex" | "walletAddress">>): PlayerProfile | null {
+export function updateProfile(publicKey: string, updates: Partial<Pick<PlayerProfile, "xp" | "level" | "rank" | "skinIndex" | "walletAddress">>): PlayerProfile | null {
   const players = loadPlayers();
   const key = publicKey.toLowerCase();
   const p = players[key];
   if (!p) return null;
 
-  if (updates.worldId !== undefined) p.worldId = updates.worldId;
+
   if (updates.xp !== undefined) p.xp = updates.xp;
   if (updates.level !== undefined) p.level = updates.level;
   if (updates.rank !== undefined) p.rank = updates.rank;
@@ -305,7 +304,7 @@ export function updateProfile(publicKey: string, updates: Partial<Pick<PlayerPro
 
   // Sync changed fields to ENS
   const ensUpdates: Partial<Record<string, string>> = {};
-  if (updates.worldId !== undefined) ensUpdates.worldId = p.worldId;
+
   if (updates.xp !== undefined) ensUpdates.xp = String(p.xp);
   if (updates.level !== undefined) ensUpdates.level = String(p.level);
   if (updates.rank !== undefined) ensUpdates.rank = p.rank;

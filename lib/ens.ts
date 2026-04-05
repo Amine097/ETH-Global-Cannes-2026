@@ -1,3 +1,13 @@
+// ══════════════════════════════════════════════════════════════
+// ENS INTEGRATION — Core on-chain storage layer
+// All player profiles are stored as ENS text records on Sepolia
+// Subnames: username.raidbattle.eth
+// Encrypted fields: xp, level, rank, skinIndex (AES-256-GCM)
+// Public fields: publicKey, etherAddress, linkedAt
+// Player index: encrypted mapping pk→username on parent name
+// Ranking: encrypted leaderboard on parent name
+// ══════════════════════════════════════════════════════════════
+
 import {
   createPublicClient,
   createWalletClient,
@@ -84,7 +94,6 @@ function decrypt(encoded: string): string {
 const PROFILE_KEYS = [
   "publicKey",
   "etherAddress",
-  "worldId",
   "xp",
   "level",
   "rank",
@@ -314,7 +323,6 @@ export async function readRankingFromEns(): Promise<{
 export function toProfileRecords(data: {
   publicKey: string;
   etherAddress: string;
-  worldId: string;
   xp: number;
   level: number;
   rank: string;
@@ -324,7 +332,6 @@ export function toProfileRecords(data: {
   return {
     publicKey: data.publicKey,
     etherAddress: data.etherAddress,
-    worldId: data.worldId,
     xp: String(data.xp),
     level: String(data.level),
     rank: data.rank,

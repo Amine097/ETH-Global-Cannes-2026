@@ -53,6 +53,7 @@ interface Props {
   walletAddress: string;
   onBattle: () => void;
   onConnectWallet: () => void;
+  onLeaderboard?: () => void;
   onLogout: () => void;
 }
 
@@ -61,7 +62,7 @@ function xpForLevel(level: number): number {
   return level * (level - 1) * 50;
 }
 
-export const PlayerProfile = ({ etherAddress, publicKey, username, walletAddress, onBattle, onConnectWallet, onLogout }: Props) => {
+export const PlayerProfile = ({ etherAddress, publicKey, username, walletAddress, onBattle, onConnectWallet, onLeaderboard, onLogout }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [profile, setProfile] = useState<ProfileData>({ xp: 0, level: 1, rank: "bronze", skinIndex: 1, position: null, total: null });
 
@@ -196,9 +197,8 @@ export const PlayerProfile = ({ etherAddress, publicKey, username, walletAddress
           <div className="space-y-3">
             <StatRow label="Bracelet" value={etherAddress.slice(0, 8) + "…" + etherAddress.slice(-6)} mono />
             <div className="h-px bg-[#1e1608]" />
-            <StatRow label="World ID" value="Verified ✓" accent />
-            <div className="h-px bg-[#1e1608]" />
-            <StatRow label="ENS" value={`${username.toLowerCase()}.raidbattle.eth`} />
+            {/* ENS — on-chain identity */}
+            <StatRow label="ENS" value={`${username.toLowerCase()}.raidbattle.eth`} accent />
           </div>
         </div>
 
@@ -240,6 +240,16 @@ export const PlayerProfile = ({ etherAddress, publicKey, username, walletAddress
         >
           ⚔ Seek Battle
         </button>
+
+        {/* Admin: Leaderboard */}
+        {onLeaderboard && (
+          <button
+            onClick={onLeaderboard}
+            className="mb-3 w-full rounded-lg border border-[#c9a227]/30 bg-[#c9a227]/5 px-8 py-3 font-cinzel text-sm tracking-wider text-[#c9a227] hover:bg-[#c9a227]/10 transition-all"
+          >
+            🏰 Hall of Champions
+          </button>
+        )}
 
         <button
           onClick={onLogout}

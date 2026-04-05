@@ -1,14 +1,13 @@
 # Raid Battle — ETH Global Cannes 2026
 
-NFC bracelet-based battle game with on-chain identity (ENS), crypto wagers (Dynamic), and minigame combat.
+NFC bracelet-based battle game with on-chain identity (ENS) and crypto wagers (Dynamic).
 
 ## Stack
 
 - **Next.js 14** (App Router, TypeScript, Tailwind)
-- **ENS on Sepolia** — player profiles stored as encrypted text records on `username.raidbattle.eth`
+- **ENS on Sepolia** — player profiles as encrypted text records on `username.raidbattle.eth`
 - **Dynamic** — wallet connection (JS SDK) + escrow for wager battles
 - **HaLo NFC** (libhalo) — physical bracelet identity via ECDSA signatures
-- **World ID** (IDKit v4) — proof-of-humanity verification (optional gate)
 - **viem / ethers** — blockchain interaction
 
 ## How it works
@@ -16,47 +15,44 @@ NFC bracelet-based battle game with on-chain identity (ENS), crypto wagers (Dyna
 1. **Scan** — Tap your HaLo NFC bracelet to create or log into your account
 2. **Choose a name** — Get `username.raidbattle.eth` subname on ENS
 3. **Connect wallet** — Link a Sepolia wallet via Dynamic for wager battles
-4. **Challenge** — Tap an opponent's bracelet or scan their QR to send a battle invite
-5. **Choose mode** — Free battle (XP only) or wager battle (stake Sepolia ETH, 5% platform fee)
+4. **Challenge** — Tap an opponent's bracelet or scan their QR to challenge
+5. **Choose mode** — Free battle (XP only) or wager battle (stake ETH, 5% fee)
 6. **Fight** — Random minigame: Tap Frenzy, Lightning Reflexes, or Battle Rhythm
 7. **Progress** — Earn XP, level up, climb ranks: Squire → Knight → Lord → Duke → Legend
-8. **Get paid** — Wager winner receives 95% of the pot via on-chain escrow payout
+8. **Get paid** — Wager winner receives 95% of the pot via on-chain escrow
 
-## Architecture
+## Where we use ENS and Dynamic
 
-```
-Browser (mobile)
-  ├── HaLo NFC scan (libhalo) — bracelet identity
-  ├── Dynamic JS SDK — wallet connection + tx signing (lazy-loaded)
-  ├── World ID (IDKit v4) — proof of humanity
-  └── Battle UI — minigames, real-time polling, arena video
+### ENS (Ethereum Name Service) — on-chain identity & storage
 
-Server (Next.js API routes)
-  ├── /api/halo/challenge   — NFC challenge generation
-  ├── /api/players/*        — Registration, lookup, profile, wallet, ranking
-  ├── /api/battle           — Initiate, respond, minigame submit, resolve
-  ├── /api/escrow           — Deposit tracking, balance check, payout
-  ├── /api/verify           — World ID proof verification
-  └── /api/rp-context       — Signed request context for IDKit
+| Where | File | What |
+|-------|------|------|
+| Player profiles | `lib/ens.ts` → `createSubnameWithProfile()` | Creates `username.raidbattle.eth` with text records |
+| Encrypted game data | `lib/ens.ts` → `encrypt()` / `decrypt()` | XP, level, rank, skinIndex stored as AES-256-GCM |
+| Player index | `lib/ens.ts` → `writePlayerIndex()` | Global pk→username mapping on parent name |
+| Ranking | `lib/ens.ts` → `writeRankingToEns()` | Encrypted leaderboard on parent name |
+| Profile reads | `lib/store.ts` → `getProfileFromEns()` | Primary data source, JSON is just cache |
+| Registration check | `app/api/players/register` | Checks ENS index + subname before allowing signup |
+| Login | `app/api/players/check` | Resolves player from ENS when cache is empty |
+| Profile display | `components/PlayerProfile.tsx` | Shows `username.raidbattle.eth` |
 
-Storage
-  ├── JSON (/tmp on Vercel)  — Local cache for fast reads
-  └── ENS Sepolia            — On-chain profiles (text records)
-      ├── publicKey, etherAddress, worldId, linkedAt  (public)
-      ├── xp, level, rank, skinIndex                  (AES-256-GCM encrypted)
-      └── ranking (encrypted, on parent name)
+### Dynamic — wallet connection & wager escrow
 
-Escrow
-  └── Server wallet (ENS owner key) holds wager deposits on Sepolia
-      ├── Both players deposit before fight starts
-      ├── Winner gets 95% payout after resolution
-      └── 5% platform fee retained in escrow wallet
-```
+| Where | File | What |
+|-------|------|------|
+| Wallet provider | `components/DynamicProvider.tsx` | `DynamicContextProvider` with Ethereum connectors |
+| Lazy loading | `components/WithDynamic.tsx` | Only loads SDK on wallet/battle pages (perf) |
+| Connect wallet | `components/WalletConnect.tsx` | `useDynamicContext()` + `setShowAuthFlow()` |
+| Send deposit | `components/BattleArena.tsx` | `primaryWallet.getWalletClient().sendTransaction()` |
+| Escrow payout | `lib/escrow.ts` | Server wallet sends 95% to winner on Sepolia |
+| Escrow API | `app/api/escrow/route.ts` | Deposit tracking, balance check, payout |
+| Profile display | `components/PlayerProfile.tsx` | Shows connected wallet address |
+| Battle scanner | `components/BattleScanner.tsx` | Wager mode requires connected wallet |
 
 ## Quick start
 
 ```bash
-cp .env.example .env.local   # fill in values
+cp .env.example .env.local
 npm install
 npm run dev
 ```
@@ -64,48 +60,17 @@ npm run dev
 ## Env vars
 
 ```env
-# World ID
-NEXT_PUBLIC_APP_ID=          # World Developer Portal app ID
-WLD_RP_ID=                   # Relying Party ID
-WLD_SIGNING_KEY=             # Signing key for rp_context
-
-# ENS (Sepolia)
-ENS_PARENT_NAME=             # e.g. raidbattle.eth
-ENS_OWNER_PRIVATE_KEY=       # Private key of ENS name owner
-SEPOLIA_RPC_URL=             # Sepolia RPC endpoint
-
-# Dynamic (wallet connection for wagers)
-NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID=  # From Dynamic dashboard
-
-# Auth
-NEXTAUTH_URL=                # Public URL (ngrok in dev)
-NEXTAUTH_SECRET=             # openssl rand -base64 32
+ENS_PARENT_NAME=raidbattle.eth
+ENS_OWNER_PRIVATE_KEY=xxx
+SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
+NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID=xxx
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=openssl-rand-base64-32
 ```
-
-## ENS data model
-
-Each player gets a subname `username.raidbattle.eth` with text records:
-
-| Key | Encrypted | Description |
-|-----|-----------|-------------|
-| `publicKey` | No | HaLo bracelet public key |
-| `etherAddress` | No | Bracelet Ethereum address |
-| `worldId` | No | `"verified"` if World ID passed |
-| `linkedAt` | No | Registration timestamp |
-| `xp` | Yes (AES-256-GCM) | Experience points |
-| `level` | Yes | Player level |
-| `rank` | Yes | Squire/Knight/Lord/Duke/Legend |
-| `skinIndex` | Yes | Character skin (1-6) |
-
-## Battle system
-
-- **Minigames**: Tap Frenzy (tap spam), Lightning Reflexes (reaction time), Battle Rhythm (score-based)
-- **Win probability**: 50% base ± level bonus ± minigame performance, clamped [10%, 90%]
-- **XP**: Winners gain 50+ XP (bonus for beating higher level), losers lose proportionally
-- **Ranks**: Squire (1-4) → Knight (5-9) → Lord (10-14) → Duke (15-19) → Legend (20+)
 
 ## Scripts
 
 ```bash
-npx tsx scripts/resync-ens.ts   # Re-sync all players to ENS
+npx tsx scripts/resync-ens.ts    # Re-sync all players to ENS
+npx tsx scripts/sync-index.ts    # Rebuild player index on ENS
 ```

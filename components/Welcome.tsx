@@ -104,10 +104,6 @@ function HowItWorks() {
                 <p className="font-cinzel text-[10px] font-semibold text-[#c9a227]">HaLo NFC</p>
                 <p className="font-crimson text-[10px] text-[#5a4010]">Bracelet identity</p>
               </div>
-              <div className="rounded-md bg-[#100e08] border border-[#1e1608] px-3 py-2">
-                <p className="font-cinzel text-[10px] font-semibold text-[#c9a227]">World ID</p>
-                <p className="font-crimson text-[10px] text-[#5a4010]">Proof of humanity</p>
-              </div>
             </div>
           </div>
         </div>
@@ -209,8 +205,6 @@ export const Welcome = ({ onEnter }: Props) => {
 
       {/* Footer badges */}
       <div className="relative flex items-center justify-center gap-4 font-cinzel text-[10px] tracking-[0.3em] text-[#3d2a10] uppercase">
-        <span>World ID</span>
-        <span className="text-[#2e2010]">·</span>
         <span>HaLo NFC</span>
         <span className="text-[#2e2010]">·</span>
         <span>ENS</span>

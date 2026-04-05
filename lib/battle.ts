@@ -131,7 +131,6 @@ export async function createBattle(
       publicKey: attackerData.publicKey.toLowerCase(),
       etherAddress: attackerData.etherAddress.toLowerCase(),
       username: attackerData.username,
-      worldId: "",
       xp: 0,
       level: attackerData.level,
       rank: attackerData.rank,
