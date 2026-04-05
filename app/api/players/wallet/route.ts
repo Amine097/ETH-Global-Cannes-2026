@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { updateProfile, getProfile } from "@/lib/store";
+import { updateProfile, getProfile, getProfileFromEns, saveBinding } from "@/lib/store";
 
 export async function POST(req: NextRequest) {
   const { publicKey, walletAddress } = (await req.json()) as {
@@ -11,9 +11,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
-  const profile = getProfile(publicKey);
+  // Try local JSON first, then ENS
+  let profile = getProfile(publicKey);
+  if (!profile) {
+    profile = await getProfileFromEns(publicKey);
+  }
+
   if (!profile) {
     return NextResponse.json({ error: "Player not found" }, { status: 404 });
+  }
+
+  // Ensure player exists in local JSON (hydrate from ENS if needed)
+  if (!getProfile(publicKey)) {
+    saveBinding({
+      playerId: profile.publicKey,
+      publicKey: profile.publicKey,
+      etherAddress: profile.etherAddress,
+      username: profile.username,
+      linkedAt: new Date(profile.linkedAt),
+    });
   }
 
   updateProfile(publicKey, { walletAddress: walletAddress.toLowerCase() });
