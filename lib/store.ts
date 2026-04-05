@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import { createSubnameWithProfile, updateTextRecords, readProfile as ensReadProfile, readPlayerIndex, writePlayerIndex, toProfileRecords } from "./ens";
+import { updateTextRecords, readProfile as ensReadProfile, readPlayerIndex } from "./ens";
 
 // ── Player profile (ENS-ready: each field maps to a text record) ──
 
@@ -79,23 +79,7 @@ function enqueueEns(task: () => Promise<void>) {
   processEnsQueue();
 }
 
-function syncToEns(profile: PlayerProfile) {
-  if (!profile.username) return;
-  const records = toProfileRecords(profile);
-  // Queue: first create subname + profile, then update the index
-  enqueueEns(async () => {
-    await createSubnameWithProfile(profile.username, records);
-  });
-  enqueueEns(async () => {
-    const players = loadPlayers();
-    const index: Record<string, string> = {};
-    for (const [pk, p] of Object.entries(players)) {
-      if (p.username) index[pk] = p.username;
-    }
-    await writePlayerIndex(index);
-  });
-}
-
+// ENS field sync (for battle XP updates — fire-and-forget via queue)
 function syncFieldsToEns(username: string, updates: Partial<Record<string, string>>) {
   if (!username) return;
   enqueueEns(async () => {
@@ -163,18 +147,8 @@ export function getBindingByPlayer(playerId: string): Binding | undefined {
   return getBindingByPublicKey(playerId);
 }
 
-// Save to local JSON + trigger ENS sync (fire-and-forget, for battle XP updates etc.)
+// Save player to cache (ENS writes are handled explicitly by register + updateProfile)
 export function saveBinding(binding: Binding): void {
-  saveBindingLocal(binding);
-  const key = binding.publicKey.toLowerCase();
-  const p = loadPlayers()[key];
-  if (p?.username) {
-    syncToEns(p);
-  }
-}
-
-// Save to local JSON only — no ENS sync (used by register which handles ENS itself)
-export function saveBindingLocal(binding: Binding): void {
   const players = loadPlayers();
   const key = binding.publicKey.toLowerCase();
   const existing = players[key];
@@ -202,9 +176,6 @@ export function setUsername(publicKey: string, username: string): Binding | null
 
   p.username = username;
   savePlayers(players);
-
-  // Create ENS subname with full profile now that we have a username
-  syncToEns(p);
 
   return profileToBinding(p);
 }

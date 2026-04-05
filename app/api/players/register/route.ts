@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
-import { getBindingByPublicKey, getBindingByUsername, saveBindingLocal, isRegistered } from "@/lib/store";
+import { getBindingByPublicKey, getBindingByUsername, saveBinding, isRegistered } from "@/lib/store";
 import { subnameExists, createSubnameWithProfile, writePlayerIndex, readPlayerIndex, toProfileRecords } from "@/lib/ens";
 
 // ── ENS INTEGRATION — Registration writes player profile + index on-chain ──
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Save to local cache (for this serverless instance) ──
-  saveBindingLocal({
+  saveBinding({
     playerId: pk,
     publicKey: pk,
     etherAddress: addr,

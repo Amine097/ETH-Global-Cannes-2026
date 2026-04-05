@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { getProfile, getProfileFromEns, updateProfile, saveBindingLocal } from "./store";
+import { getProfile, getProfileFromEns, updateProfile, saveBinding } from "./store";
 import type { PlayerProfile } from "./store";
 
 // ── Types ──
@@ -113,7 +113,7 @@ export async function createBattle(
     if (p?.username) return p;
     p = await getProfileFromEns(pk);
     if (p?.username) {
-      saveBindingLocal({
+      saveBinding({
         playerId: p.publicKey,
         publicKey: p.publicKey,
         etherAddress: p.etherAddress,
@@ -140,7 +140,7 @@ export async function createBattle(
     };
     // Also hydrate cache
     if (!getProfile(attackerPk)) {
-      saveBindingLocal({
+      saveBinding({
         playerId: attacker.publicKey,
         publicKey: attacker.publicKey,
         etherAddress: attacker.etherAddress,

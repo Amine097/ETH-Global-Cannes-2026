@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { updateProfile, getProfile, getProfileFromEns, saveBindingLocal } from "@/lib/store";
+import { updateProfile, getProfile, getProfileFromEns, saveBinding } from "@/lib/store";
 
 export async function POST(req: NextRequest) {
   const { publicKey, walletAddress } = (await req.json()) as {
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
   // Ensure player exists in local JSON (hydrate from ENS if needed)
   if (!getProfile(publicKey)) {
-    saveBindingLocal({
+    saveBinding({
       playerId: profile.publicKey,
       publicKey: profile.publicKey,
       etherAddress: profile.etherAddress,
