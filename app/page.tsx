@@ -31,6 +31,9 @@ interface PlayerData {
   publicKey: string;
   etherAddress: string;
   username: string;
+  level: number;
+  skinIndex: number;
+  rank: string;
 }
 
 interface SessionData {
@@ -130,6 +133,9 @@ export default function Home() {
             publicKey: data.player.publicKey,
             etherAddress: data.player.etherAddress,
             username: data.player.username,
+            level: data.player.level ?? 1,
+            skinIndex: data.player.skinIndex ?? 1,
+            rank: data.player.rank ?? "bronze",
           };
           setPlayer(confirmed);
           setWalletAddress(data.player.walletAddress ?? "");
@@ -216,6 +222,9 @@ export default function Home() {
         publicKey: check.player.publicKey,
         etherAddress: check.player.etherAddress,
         username: check.player.username,
+        level: check.player.level ?? 1,
+        skinIndex: check.player.skinIndex ?? 1,
+        rank: check.player.rank ?? "bronze",
       };
       setPlayer(p);
       setWalletAddress(check.player.walletAddress ?? "");
@@ -309,6 +318,9 @@ export default function Home() {
             publicKey: scanData.publicKey,
             etherAddress: scanData.etherAddress,
             username,
+            level: 1,
+            skinIndex: 1,
+            rank: "bronze",
           };
           setPlayer(p);
           saveSession(p);
@@ -362,6 +374,15 @@ export default function Home() {
     return (
       <BattleScanner
         playerPk={player.publicKey}
+        playerInfo={{
+          publicKey: player.publicKey,
+          etherAddress: player.etherAddress,
+          username: player.username,
+          level: player.level,
+          skinIndex: player.skinIndex,
+          rank: player.rank,
+          walletAddress: walletAddress || undefined,
+        }}
         hasWallet={!!walletAddress}
         onConnectWallet={handleConnectWallet}
         onBack={() => setView("profile")}

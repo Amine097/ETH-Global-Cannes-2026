@@ -20,14 +20,25 @@ type BattleMode = "free" | "wager";
 
 const BET_OPTIONS = ["0.001", "0.005", "0.01", "0.05"];
 
+interface PlayerInfo {
+  publicKey: string;
+  etherAddress: string;
+  username: string;
+  level: number;
+  skinIndex: number;
+  rank: string;
+  walletAddress?: string;
+}
+
 interface Props {
   playerPk: string;
+  playerInfo: PlayerInfo;
   hasWallet: boolean;
   onConnectWallet: () => void;
   onBack: () => void;
 }
 
-export const BattleScanner = ({ playerPk, hasWallet, onConnectWallet, onBack }: Props) => {
+export const BattleScanner = ({ playerPk, playerInfo, hasWallet, onConnectWallet, onBack }: Props) => {
   const [step, setStep] = useState<Step>("mode-select");
   const [battleMode, setBattleMode] = useState<BattleMode>("free");
   const [betAmount, setBetAmount] = useState<string>("0.01");
@@ -131,6 +142,15 @@ export const BattleScanner = ({ playerPk, hasWallet, onConnectWallet, onBack }: 
           defenderPk,
           mode: battleMode,
           wagerAmount: battleMode === "wager" ? betAmount : undefined,
+          attackerData: {
+            publicKey: playerInfo.publicKey,
+            username: playerInfo.username,
+            etherAddress: playerInfo.etherAddress,
+            level: playerInfo.level,
+            skinIndex: playerInfo.skinIndex,
+            rank: playerInfo.rank,
+            walletAddress: playerInfo.walletAddress,
+          },
         }),
       });
       const data = await res.json();

@@ -89,20 +89,30 @@ export function rankFromLevel(level: number): string {
 
 // ── Battle logic ──
 
+// Data the client sends about itself (so server doesn't need to look it up)
+export interface AttackerData {
+  publicKey: string;
+  username: string;
+  etherAddress: string;
+  level: number;
+  skinIndex: number;
+  rank: string;
+  walletAddress?: string;
+}
+
 export async function createBattle(
   attackerPk: string,
   defenderPk: string,
   mode: BattleMode = "free",
   wagerAmount?: string,
+  attackerData?: AttackerData,
 ): Promise<Battle | { error: string }> {
-  // Helper: get profile from cache or ENS, hydrate cache if found on ENS
+  // Helper: get profile from cache or ENS, hydrate cache if found
   async function loadPlayer(pk: string): Promise<PlayerProfile | null> {
     let p = getProfile(pk);
     if (p?.username) return p;
-    // Not in cache — fetch from ENS
     p = await getProfileFromEns(pk);
     if (p?.username) {
-      // Hydrate local cache for future requests
       saveBinding({
         playerId: p.publicKey,
         publicKey: p.publicKey,
@@ -114,7 +124,36 @@ export async function createBattle(
     return p;
   }
 
-  const attacker = await loadPlayer(attackerPk);
+  // Attacker: trust client data if provided (they just logged in, may not be cached yet)
+  let attacker: PlayerProfile | null = null;
+  if (attackerData?.username) {
+    attacker = {
+      publicKey: attackerData.publicKey.toLowerCase(),
+      etherAddress: attackerData.etherAddress.toLowerCase(),
+      username: attackerData.username,
+      worldId: "",
+      xp: 0,
+      level: attackerData.level,
+      rank: attackerData.rank,
+      skinIndex: attackerData.skinIndex,
+      walletAddress: attackerData.walletAddress ?? "",
+      linkedAt: new Date().toISOString(),
+    };
+    // Also hydrate cache
+    if (!getProfile(attackerPk)) {
+      saveBinding({
+        playerId: attacker.publicKey,
+        publicKey: attacker.publicKey,
+        etherAddress: attacker.etherAddress,
+        username: attacker.username,
+        linkedAt: new Date(),
+      });
+    }
+  } else {
+    attacker = await loadPlayer(attackerPk);
+  }
+
+  // Defender: always look up server-side (they were already connected)
   const defender = await loadPlayer(defenderPk);
 
   if (!attacker || !attacker.username) return { error: "Attacker not found" };
