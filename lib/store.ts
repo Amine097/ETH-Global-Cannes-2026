@@ -59,31 +59,48 @@ function savePlayers(players: Record<string, PlayerProfile>) {
 
 // ── ENS sync (fire-and-forget, logs errors) ──
 
+// ENS write queue — ensures transactions are sequential (no nonce conflicts)
+const ensQueue: (() => Promise<void>)[] = [];
+let ensProcessing = false;
+
+async function processEnsQueue() {
+  if (ensProcessing) return;
+  ensProcessing = true;
+  while (ensQueue.length > 0) {
+    const task = ensQueue.shift()!;
+    try { await task(); } catch (err) {
+      console.error(`[ENS] Queue task failed:`, err instanceof Error ? err.message : err);
+    }
+  }
+  ensProcessing = false;
+}
+
+function enqueueEns(task: () => Promise<void>) {
+  ensQueue.push(task);
+  processEnsQueue();
+}
+
 function syncToEns(profile: PlayerProfile) {
   if (!profile.username) return;
   const records = toProfileRecords(profile);
-  createSubnameWithProfile(profile.username, records).catch((err) => {
-    console.error(`[ENS] Failed to sync full profile for ${profile.username}:`, err.message ?? err);
+  // Queue: first create subname + profile, then update the index
+  enqueueEns(async () => {
+    await createSubnameWithProfile(profile.username, records);
   });
-  // Also update the global pk→username index on ENS
-  syncPlayerIndex();
-}
-
-function syncPlayerIndex() {
-  const players = loadPlayers();
-  const index: Record<string, string> = {};
-  for (const [pk, p] of Object.entries(players)) {
-    if (p.username) index[pk] = p.username;
-  }
-  writePlayerIndex(index).catch((err) => {
-    console.error(`[ENS] Failed to sync player index:`, err.message ?? err);
+  enqueueEns(async () => {
+    const players = loadPlayers();
+    const index: Record<string, string> = {};
+    for (const [pk, p] of Object.entries(players)) {
+      if (p.username) index[pk] = p.username;
+    }
+    await writePlayerIndex(index);
   });
 }
 
 function syncFieldsToEns(username: string, updates: Partial<Record<string, string>>) {
   if (!username) return;
-  updateTextRecords(username, updates).catch((err) => {
-    console.error(`[ENS] Failed to sync fields for ${username}:`, err.message ?? err);
+  enqueueEns(async () => {
+    await updateTextRecords(username, updates);
   });
 }
 
