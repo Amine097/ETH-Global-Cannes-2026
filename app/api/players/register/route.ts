@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
-import {
-  getBindingByPublicKey,
-  getBindingByUsername,
-  saveBinding,
-  isRegistered,
-} from "@/lib/store";
-import { subnameExists } from "@/lib/ens";
+import { getBindingByPublicKey, getBindingByUsername, saveBindingLocal, isRegistered } from "@/lib/store";
+import { subnameExists, createSubnameWithProfile, writePlayerIndex, readPlayerIndex, toProfileRecords } from "@/lib/ens";
+
+// ── ENS INTEGRATION — Registration writes player profile + index on-chain ──
 
 export async function POST(req: NextRequest) {
   const { challenge, signature, publicKey, etherAddress, username } = (await req.json()) as {
@@ -25,6 +22,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid challenge format" }, { status: 400 });
   }
 
+  // Verify bracelet signature
   try {
     const digest = ethers.getBytes("0x" + challenge);
     const recovered = ethers.recoverAddress(digest, signature);
@@ -35,13 +33,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Signature verification failed" }, { status: 400 });
   }
 
-  // ── STRICT CHECK: is this publicKey already registered? ──
-  // Check 1: local JSON cache
+  // ── CHECK 1: is this publicKey already registered? (ENS is authoritative) ──
   const existingLocal = getBindingByPublicKey(publicKey);
   if (existingLocal?.username) {
     return NextResponse.json({ success: true, player: existingLocal, alreadyRegistered: true });
   }
-  // Check 2: ENS player index (authoritative)
   try {
     const ensCheck = await isRegistered(publicKey);
     if (ensCheck.registered && ensCheck.username) {
@@ -51,13 +47,8 @@ export async function POST(req: NextRequest) {
         alreadyRegistered: true,
       });
     }
-  } catch (err) {
-    // ENS check failed — REFUSE registration to be safe (prevent duplicates)
-    console.error("[Register] ENS check failed, refusing registration:", err);
-    return NextResponse.json(
-      { error: "Could not verify identity. Please try again." },
-      { status: 503 }
-    );
+  } catch {
+    return NextResponse.json({ error: "Could not verify identity. Please try again." }, { status: 503 });
   }
 
   // ── Validate username ──
@@ -72,7 +63,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Only lowercase letters, numbers, _ and -" }, { status: 400 });
   }
 
-  // ── STRICT CHECK: is this username already taken? ──
+  // ── CHECK 2: is this username already taken? (ENS is authoritative) ──
   const takenLocal = getBindingByUsername(trimmed);
   if (takenLocal) {
     return NextResponse.json({ error: "Username already taken" }, { status: 409 });
@@ -82,25 +73,49 @@ export async function POST(req: NextRequest) {
     if (takenEns) {
       return NextResponse.json({ error: "Username already taken" }, { status: 409 });
     }
-  } catch (err) {
-    // ENS check failed — REFUSE to be safe
-    console.error("[Register] ENS username check failed:", err);
-    return NextResponse.json(
-      { error: "Could not verify username. Please try again." },
-      { status: 503 }
-    );
+  } catch {
+    return NextResponse.json({ error: "Could not verify username. Please try again." }, { status: 503 });
   }
 
-  // ── Create the player ──
-  const binding = {
-    playerId: publicKey.toLowerCase(),
-    publicKey: publicKey.toLowerCase(),
-    etherAddress: etherAddress.toLowerCase(),
+  // ── WRITE TO ENS (synchronous — wait for confirmation) ──
+  const pk = publicKey.toLowerCase();
+  const addr = etherAddress.toLowerCase();
+  const now = new Date().toISOString();
+
+  try {
+    // 1. Create subname + text records on ENS
+    const records = toProfileRecords({
+      publicKey: pk,
+      etherAddress: addr,
+      xp: 0,
+      level: 1,
+      rank: "bronze",
+      skinIndex: 1,
+      linkedAt: now,
+    });
+    await createSubnameWithProfile(trimmed, records);
+
+    // 2. Update player index on ENS
+    const index = (await readPlayerIndex()) ?? {};
+    index[pk] = trimmed;
+    await writePlayerIndex(index);
+  } catch (err) {
+    console.error("[Register] ENS write failed:", err);
+    return NextResponse.json({ error: "Registration failed. Please try again." }, { status: 500 });
+  }
+
+  // ── Save to local cache (for this serverless instance) ──
+  saveBindingLocal({
+    playerId: pk,
+    publicKey: pk,
+    etherAddress: addr,
     username: trimmed,
     linkedAt: new Date(),
-  };
-  saveBinding(binding);
-  // saveBinding triggers syncToEns → creates subname + updates player index
+  });
 
-  return NextResponse.json({ success: true, player: binding, isNew: true }, { status: 201 });
+  return NextResponse.json({
+    success: true,
+    player: { publicKey: pk, etherAddress: addr, username: trimmed },
+    isNew: true,
+  }, { status: 201 });
 }

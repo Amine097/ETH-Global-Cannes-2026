@@ -163,17 +163,26 @@ export function getBindingByPlayer(playerId: string): Binding | undefined {
   return getBindingByPublicKey(playerId);
 }
 
+// Save to local JSON + trigger ENS sync (fire-and-forget, for battle XP updates etc.)
 export function saveBinding(binding: Binding): void {
+  saveBindingLocal(binding);
+  const key = binding.publicKey.toLowerCase();
+  const p = loadPlayers()[key];
+  if (p?.username) {
+    syncToEns(p);
+  }
+}
+
+// Save to local JSON only — no ENS sync (used by register which handles ENS itself)
+export function saveBindingLocal(binding: Binding): void {
   const players = loadPlayers();
   const key = binding.publicKey.toLowerCase();
   const existing = players[key];
 
-  const isNew = !existing;
   players[key] = {
     publicKey: binding.publicKey.toLowerCase(),
     etherAddress: binding.etherAddress.toLowerCase(),
     username: (binding.username ?? existing?.username ?? "").toLowerCase(),
-
     xp: existing?.xp ?? 0,
     level: existing?.level ?? 1,
     rank: existing?.rank ?? "bronze",
@@ -183,11 +192,6 @@ export function saveBinding(binding: Binding): void {
   };
 
   savePlayers(players);
-
-  // Sync to ENS on new registration with username
-  if (isNew && players[key].username) {
-    syncToEns(players[key]);
-  }
 }
 
 export function setUsername(publicKey: string, username: string): Binding | null {

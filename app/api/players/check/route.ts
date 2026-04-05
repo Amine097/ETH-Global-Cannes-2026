@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isRegistered, getProfileFromEns, getProfile, saveBinding } from "@/lib/store";
+import { isRegistered, getProfileFromEns, getProfile, saveBindingLocal } from "@/lib/store";
 
 export async function GET(req: NextRequest) {
   const pk = req.nextUrl.searchParams.get("pk");
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   // ── Hydrate local cache so future requests (battle, etc.) find the player instantly ──
   if (profile && profile.username && !getProfile(pk)) {
-    saveBinding({
+    saveBindingLocal({
       playerId: profile.publicKey,
       publicKey: profile.publicKey,
       etherAddress: profile.etherAddress,
