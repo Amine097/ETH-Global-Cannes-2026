@@ -10,6 +10,7 @@ import { BattleScanner } from "@/components/BattleScanner";
 import { BattleInvite } from "@/components/BattleInvite";
 import { BattleArena } from "@/components/BattleArena";
 import { WalletConnect } from "@/components/WalletConnect";
+import { WithDynamic } from "@/components/WithDynamic";
 
 type View =
   | "loading"
@@ -57,12 +58,14 @@ export default function Home() {
 
   useEffect(() => {
     const saved = localStorage.getItem("player");
-    const worldVerified = localStorage.getItem("world_verified") === "true";
+    // const worldVerified = localStorage.getItem("world_verified") === "true";
 
     if (saved) {
       try {
         const p = JSON.parse(saved) as PlayerData;
-        if (p.publicKey && p.username && worldVerified) {
+        // World ID check disabled for now — skip verify step
+        // if (p.publicKey && p.username && worldVerified) {
+        if (p.publicKey && p.username) {
           setPlayer(p);
           // Fetch wallet address
           fetch(`/api/players/check?pk=${encodeURIComponent(p.publicKey)}`)
@@ -72,21 +75,21 @@ export default function Home() {
           setView("profile");
           return;
         }
-        // Player exists but not World ID verified — force re-verify
-        if (p.publicKey && p.username && !worldVerified) {
-          setPlayer(p);
-          setView("verify");
-          return;
-        }
+        // World ID re-verify disabled for now
+        // if (p.publicKey && p.username && !worldVerified) {
+        //   setPlayer(p);
+        //   setView("verify");
+        //   return;
+        // }
       } catch { /* ignore */ }
     }
 
-    // Returning from World App redirect?
-    const pending = localStorage.getItem("pending_verify");
-    if (pending === "true") {
-      setView("verify");
-      return;
-    }
+    // World ID redirect check disabled for now
+    // const pending = localStorage.getItem("pending_verify");
+    // if (pending === "true") {
+    //   setView("verify");
+    //   return;
+    // }
 
     setView("welcome");
   }, []);
@@ -137,8 +140,10 @@ export default function Home() {
   // ── Auth flow ──
 
   function startAuth() {
-    localStorage.setItem("pending_verify", "true");
-    setView("verify");
+    // World ID verify disabled for now — go straight to scan
+    // localStorage.setItem("pending_verify", "true");
+    // setView("verify");
+    setView("scan");
   }
 
   function handleVerified() {
@@ -277,11 +282,13 @@ export default function Home() {
 
   if (view === "wallet-connect" && player) {
     return (
-      <WalletConnect
-        playerPk={player.publicKey}
-        onConnected={handleWalletConnected}
-        onBack={() => setView("profile")}
-      />
+      <WithDynamic>
+        <WalletConnect
+          playerPk={player.publicKey}
+          onConnected={handleWalletConnected}
+          onBack={() => setView("profile")}
+        />
+      </WithDynamic>
     );
   }
 
@@ -302,15 +309,17 @@ export default function Home() {
 
   if (view === "battle-arena" && activeBattleId && player) {
     return (
-      <BattleArena
-        battleId={activeBattleId}
-        playerPk={player.publicKey}
-        role="defender"
-        onDone={() => {
-          setActiveBattleId(null);
-          setView("profile");
-        }}
-      />
+      <WithDynamic>
+        <BattleArena
+          battleId={activeBattleId}
+          playerPk={player.publicKey}
+          role="defender"
+          onDone={() => {
+            setActiveBattleId(null);
+            setView("profile");
+          }}
+        />
+      </WithDynamic>
     );
   }
 

@@ -47,6 +47,8 @@ export interface Battle {
   attackerNewRank?: string;
   defenderNewRank?: string;
   // Escrow (for wager battles)
+  attackerDeposited?: boolean;
+  defenderDeposited?: boolean;
   escrowAddress?: string;
   payoutTx?: string;
 }

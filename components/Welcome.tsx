@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 interface Props {
   onEnter: () => void;
@@ -16,6 +16,103 @@ function EthLogo({ size = 40 }: { size?: number }) {
       <path d="M6 16.5L16 19.5L26 16.5L16 13.5L6 16.5Z" fill="#627EEA" fillOpacity="0.5" />
       <path d="M6 16.5L16 19.5V13.5L6 16.5Z" fill="#8CA0FF" fillOpacity="0.6" />
     </svg>
+  );
+}
+
+function HowItWorks() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="mt-6">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full rounded-lg border border-[#2e2010] bg-[#100e08] px-5 py-3 font-cinzel text-xs tracking-wider text-[#7a6845] hover:border-[#5a4010] hover:text-[#c9a227] transition-all"
+      >
+        {open ? "▾ Hide" : "▸ How It Works"}
+      </button>
+
+      {open && (
+        <div className="mt-3 rounded-lg border border-[#2e2010] bg-[#0d0b06] p-5 text-left">
+          {/* Step 1 */}
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#c9a227]/15 font-cinzel text-[10px] font-bold text-[#c9a227]">1</span>
+              <span className="font-cinzel text-xs font-semibold tracking-wider text-[#f0e6c8]">Scan Your Bracelet</span>
+            </div>
+            <p className="ml-7 font-crimson text-xs text-[#7a6845]">
+              Each player wears a <span className="text-[#c9a227]">HaLo NFC bracelet</span> with a unique cryptographic identity. Tap it to your phone to log in or create your account.
+            </p>
+          </div>
+
+          {/* Step 2 */}
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#c9a227]/15 font-cinzel text-[10px] font-bold text-[#c9a227]">2</span>
+              <span className="font-cinzel text-xs font-semibold tracking-wider text-[#f0e6c8]">Get Your ENS Identity</span>
+            </div>
+            <p className="ml-7 font-crimson text-xs text-[#7a6845]">
+              Choose a username and receive <span className="text-[#c9a227]">username.raidbattle.eth</span> — your profile is stored on-chain on <span className="text-[#c9a227]">ENS (Sepolia)</span>. Level, rank, and XP are encrypted on the blockchain.
+            </p>
+          </div>
+
+          {/* Step 3 */}
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#c9a227]/15 font-cinzel text-[10px] font-bold text-[#c9a227]">3</span>
+              <span className="font-cinzel text-xs font-semibold tracking-wider text-[#f0e6c8]">Challenge Opponents</span>
+            </div>
+            <p className="ml-7 font-crimson text-xs text-[#7a6845]">
+              Tap another player&apos;s bracelet or scan their QR code to send a battle challenge. They accept or decline in real-time.
+            </p>
+          </div>
+
+          {/* Step 4 */}
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#c9a227]/15 font-cinzel text-[10px] font-bold text-[#c9a227]">4</span>
+              <span className="font-cinzel text-xs font-semibold tracking-wider text-[#f0e6c8]">Battle with Minigames</span>
+            </div>
+            <p className="ml-7 font-crimson text-xs text-[#7a6845]">
+              A random minigame is picked — <span className="text-[#c9a227]">Tap Spam</span>, <span className="text-[#c9a227]">Reaction Time</span>, or <span className="text-[#c9a227]">Rhythm</span>. Your performance + level determine who wins. Earn XP and climb the ranks: Squire → Knight → Lord → Duke → Legend.
+            </p>
+          </div>
+
+          {/* Step 5 */}
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#c9a227]/15 font-cinzel text-[10px] font-bold text-[#c9a227]">5</span>
+              <span className="font-cinzel text-xs font-semibold tracking-wider text-[#f0e6c8]">Wager Battles (Optional)</span>
+            </div>
+            <p className="ml-7 font-crimson text-xs text-[#7a6845]">
+              Connect a wallet via <span className="text-[#c9a227]">Dynamic</span> and stake real crypto (Sepolia ETH). Both players deposit into an escrow. Winner takes 95% of the pot. 5% platform fee.
+            </p>
+          </div>
+
+          {/* Tech stack */}
+          <div className="mt-4 pt-3 border-t border-[#1e1608]">
+            <p className="font-cinzel text-[10px] tracking-[0.3em] text-[#5a4010] uppercase mb-2">Built With</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-md bg-[#100e08] border border-[#1e1608] px-3 py-2">
+                <p className="font-cinzel text-[10px] font-semibold text-[#c9a227]">ENS</p>
+                <p className="font-crimson text-[10px] text-[#5a4010]">On-chain profiles</p>
+              </div>
+              <div className="rounded-md bg-[#100e08] border border-[#1e1608] px-3 py-2">
+                <p className="font-cinzel text-[10px] font-semibold text-[#c9a227]">Dynamic</p>
+                <p className="font-crimson text-[10px] text-[#5a4010]">Wallet &amp; escrow</p>
+              </div>
+              <div className="rounded-md bg-[#100e08] border border-[#1e1608] px-3 py-2">
+                <p className="font-cinzel text-[10px] font-semibold text-[#c9a227]">HaLo NFC</p>
+                <p className="font-crimson text-[10px] text-[#5a4010]">Bracelet identity</p>
+              </div>
+              <div className="rounded-md bg-[#100e08] border border-[#1e1608] px-3 py-2">
+                <p className="font-cinzel text-[10px] font-semibold text-[#c9a227]">World ID</p>
+                <p className="font-crimson text-[10px] text-[#5a4010]">Proof of humanity</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -105,6 +202,9 @@ export const Welcome = ({ onEnter }: Props) => {
         <button onClick={onEnter} className="btn-gold w-full rounded-lg px-8 py-4 text-base">
           Log In / Sign Up
         </button>
+
+        {/* How it works */}
+        <HowItWorks />
       </div>
 
       {/* Footer badges */}
@@ -114,6 +214,8 @@ export const Welcome = ({ onEnter }: Props) => {
         <span>HaLo NFC</span>
         <span className="text-[#2e2010]">·</span>
         <span>ENS</span>
+        <span className="text-[#2e2010]">·</span>
+        <span>Dynamic</span>
       </div>
     </div>
   );

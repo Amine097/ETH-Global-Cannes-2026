@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { BattleArena } from "./BattleArena";
+import { WithDynamic } from "./WithDynamic";
 
 type Step =
   | "mode-select"
@@ -221,7 +222,7 @@ export const BattleScanner = ({ playerPk, hasWallet, onConnectWallet, onBack }: 
   // ── Arena phase ──
   if (step === "arena" && battleId) {
     return (
-      <BattleArena battleId={battleId} playerPk={playerPk} role="attacker" onDone={onBack} />
+      <WithDynamic><BattleArena battleId={battleId} playerPk={playerPk} role="attacker" onDone={onBack} /></WithDynamic>
     );
   }
 

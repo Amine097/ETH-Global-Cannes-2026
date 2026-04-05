@@ -21,21 +21,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
-    // Store deposit confirmation in battle state
+    // Store deposit directly on the battle object (survives in globalThis.__battles)
     const battle = getBattle(battleId);
     if (!battle) {
       return NextResponse.json({ error: "Battle not found" }, { status: 404 });
     }
 
-    // Track deposits in a global map
-    const g = globalThis as unknown as { __deposits?: Map<string, Set<string>> };
-    if (!g.__deposits) g.__deposits = new Map();
-    if (!g.__deposits.has(battleId)) g.__deposits.set(battleId, new Set());
-    g.__deposits.get(battleId)!.add(playerPk.toLowerCase());
+    const pk = playerPk.toLowerCase();
+    if (pk === battle.attacker.publicKey.toLowerCase()) {
+      battle.attackerDeposited = true;
+    } else if (pk === battle.defender.publicKey.toLowerCase()) {
+      battle.defenderDeposited = true;
+    }
 
-    const deposits = g.__deposits.get(battleId)!;
-    const bothDeposited = deposits.has(battle.attacker.publicKey.toLowerCase())
-      && deposits.has(battle.defender.publicKey.toLowerCase());
+    const bothDeposited = !!battle.attackerDeposited && !!battle.defenderDeposited;
 
     return NextResponse.json({
       confirmed: true,
@@ -56,11 +55,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Battle not found" }, { status: 404 });
     }
 
-    const g = globalThis as unknown as { __deposits?: Map<string, Set<string>> };
-    const deposits = g.__deposits?.get(battleId);
-
-    const attackerDeposited = deposits?.has(battle.attacker.publicKey.toLowerCase()) ?? false;
-    const defenderDeposited = deposits?.has(battle.defender.publicKey.toLowerCase()) ?? false;
+    const attackerDeposited = !!battle.attackerDeposited;
+    const defenderDeposited = !!battle.defenderDeposited;
 
     return NextResponse.json({
       attackerDeposited,
