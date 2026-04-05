@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { getProfile, updateProfile } from "./store";
+import { getProfile, getProfileFromEns, updateProfile } from "./store";
 
 // ── Types ──
 
@@ -88,14 +88,15 @@ export function rankFromLevel(level: number): string {
 
 // ── Battle logic ──
 
-export function createBattle(
+export async function createBattle(
   attackerPk: string,
   defenderPk: string,
   mode: BattleMode = "free",
   wagerAmount?: string,
-): Battle | { error: string } {
-  const attacker = getProfile(attackerPk);
-  const defender = getProfile(defenderPk);
+): Promise<Battle | { error: string }> {
+  // Try local JSON first, fall back to ENS
+  const attacker = getProfile(attackerPk) || await getProfileFromEns(attackerPk);
+  const defender = getProfile(defenderPk) || await getProfileFromEns(defenderPk);
 
   if (!attacker || !attacker.username) return { error: "Attacker not found" };
   if (!defender || !defender.username) return { error: "Opponent not found" };

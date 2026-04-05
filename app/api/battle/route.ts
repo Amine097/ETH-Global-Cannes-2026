@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     if (!attackerPk || !defenderPk) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
-    const result = createBattle(attackerPk, defenderPk, mode ?? "free", wagerAmount);
+    const result = await createBattle(attackerPk, defenderPk, mode ?? "free", wagerAmount);
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
