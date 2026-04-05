@@ -218,6 +218,46 @@ export async function updateTextRecords(
   }
 }
 
+// ── Player index: publicKey → username mapping (encrypted, on parent name) ──
+
+const INDEX_KEY = "playerIndex";
+
+export async function writePlayerIndex(index: Record<string, string>): Promise<void> {
+  const { wallet, pub } = getClients();
+  const account = wallet.account!;
+  const parentNode = namehash(PARENT_NAME);
+
+  const encrypted = encrypt(JSON.stringify(index));
+
+  const hash = await wallet.writeContract({
+    address: RESOLVER,
+    abi: resolverAbi,
+    functionName: "setText",
+    args: [parentNode, INDEX_KEY, encrypted],
+    chain: sepolia,
+    account,
+  });
+  await pub.waitForTransactionReceipt({ hash });
+}
+
+export async function readPlayerIndex(): Promise<Record<string, string> | null> {
+  const { pub } = getClients();
+  const parentNode = namehash(PARENT_NAME);
+
+  try {
+    const val = await pub.readContract({
+      address: RESOLVER,
+      abi: resolverAbi,
+      functionName: "text",
+      args: [parentNode, INDEX_KEY],
+    });
+    if (!val) return null;
+    return JSON.parse(decrypt(val)) as Record<string, string>;
+  } catch {
+    return null;
+  }
+}
+
 // ── Global ranking stored as encrypted text record on the parent name ──
 
 const RANKING_KEY = "ranking";

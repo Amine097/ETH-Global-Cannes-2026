@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBindingByPublicKey, getProfileFromEns } from "@/lib/store";
+import { isRegistered, getProfileFromEns } from "@/lib/store";
 
 export async function GET(req: NextRequest) {
   const pk = req.nextUrl.searchParams.get("pk");
@@ -7,20 +7,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing pk" }, { status: 400 });
   }
 
-  const binding = getBindingByPublicKey(pk);
-  if (!binding) {
+  // Check registration via JSON + ENS index
+  const check = await isRegistered(pk);
+  if (!check.registered) {
     return NextResponse.json({ registered: false });
   }
 
-  // Read profile data from ENS (falls back to JSON)
+  // Read full profile from ENS (falls back to JSON)
   const profile = await getProfileFromEns(pk);
 
   return NextResponse.json({
     registered: true,
     player: {
-      publicKey: binding.publicKey,
-      etherAddress: binding.etherAddress,
-      username: binding.username ?? null,
+      publicKey: profile?.publicKey ?? pk.toLowerCase(),
+      etherAddress: profile?.etherAddress ?? "",
+      username: profile?.username ?? check.username ?? null,
       xp: profile?.xp ?? 0,
       level: profile?.level ?? 1,
       rank: profile?.rank ?? "bronze",

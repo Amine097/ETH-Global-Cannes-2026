@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import { createSubnameWithProfile, updateTextRecords, readProfile as ensReadProfile, toProfileRecords } from "./ens";
+import { createSubnameWithProfile, updateTextRecords, readProfile as ensReadProfile, readPlayerIndex, writePlayerIndex, toProfileRecords } from "./ens";
 
 // ── Player profile (ENS-ready: each field maps to a text record) ──
 
@@ -64,6 +64,19 @@ function syncToEns(profile: PlayerProfile) {
   const records = toProfileRecords(profile);
   createSubnameWithProfile(profile.username, records).catch((err) => {
     console.error(`[ENS] Failed to sync full profile for ${profile.username}:`, err.message ?? err);
+  });
+  // Also update the global pk→username index on ENS
+  syncPlayerIndex();
+}
+
+function syncPlayerIndex() {
+  const players = loadPlayers();
+  const index: Record<string, string> = {};
+  for (const [pk, p] of Object.entries(players)) {
+    if (p.username) index[pk] = p.username;
+  }
+  writePlayerIndex(index).catch((err) => {
+    console.error(`[ENS] Failed to sync player index:`, err.message ?? err);
   });
 }
 
@@ -190,33 +203,62 @@ export function getProfile(publicKey: string): PlayerProfile | null {
   return players[publicKey.toLowerCase()] ?? null;
 }
 
+// Resolve publicKey → username via JSON first, then ENS player index
+async function resolveUsername(publicKey: string): Promise<string | null> {
+  const pk = publicKey.toLowerCase();
+  // Try local JSON
+  const players = loadPlayers();
+  if (players[pk]?.username) return players[pk].username;
+  // Try ENS player index
+  try {
+    const index = await readPlayerIndex();
+    if (index && index[pk]) return index[pk];
+  } catch { /* ignore */ }
+  return null;
+}
+
 // Async read from ENS (primary data source), falls back to JSON
 export async function getProfileFromEns(publicKey: string): Promise<PlayerProfile | null> {
-  const players = loadPlayers();
-  const local = players[publicKey.toLowerCase()];
-  if (!local?.username) return local ?? null;
+  const pk = publicKey.toLowerCase();
+  const local = loadPlayers()[pk] ?? null;
+
+  // Resolve username — from JSON or ENS index
+  const username = local?.username || (await resolveUsername(pk));
+  if (!username) return local;
 
   try {
-    const records = await ensReadProfile(local.username);
+    const records = await ensReadProfile(username);
     if (!records || !records.publicKey) return local;
 
-    // Build profile from ENS data
     return {
       publicKey: records.publicKey,
       etherAddress: records.etherAddress,
-      username: local.username,
+      username,
       worldId: (records.worldId === "verified" ? "verified" : "") as "verified" | "",
       xp: parseInt(records.xp) || 0,
       level: parseInt(records.level) || 1,
       rank: records.rank || "bronze",
       skinIndex: parseInt(records.skinIndex) || 1,
-      walletAddress: local.walletAddress || "",
-      linkedAt: records.linkedAt || local.linkedAt,
+      walletAddress: local?.walletAddress || "",
+      linkedAt: records.linkedAt || local?.linkedAt || "",
     };
   } catch (err) {
-    console.error(`[ENS] Failed to read profile for ${local.username}, falling back to JSON:`, err);
+    console.error(`[ENS] Failed to read profile for ${username}, falling back to JSON:`, err);
     return local;
   }
+}
+
+// Async check if a publicKey is registered (JSON or ENS index)
+export async function isRegistered(publicKey: string): Promise<{ registered: boolean; username?: string }> {
+  const pk = publicKey.toLowerCase();
+  const local = loadPlayers()[pk];
+  if (local?.username) return { registered: true, username: local.username };
+  // Check ENS index
+  try {
+    const index = await readPlayerIndex();
+    if (index && index[pk]) return { registered: true, username: index[pk] };
+  } catch { /* ignore */ }
+  return { registered: false };
 }
 
 export function updateProfile(publicKey: string, updates: Partial<Pick<PlayerProfile, "worldId" | "xp" | "level" | "rank" | "skinIndex" | "walletAddress">>): PlayerProfile | null {
