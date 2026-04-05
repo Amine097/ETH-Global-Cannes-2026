@@ -68,18 +68,30 @@ function saveSession(player: PlayerData) {
   localStorage.removeItem("player");
 }
 
+function isValidPlayer(p: unknown): p is PlayerData {
+  if (!p || typeof p !== "object") return false;
+  const o = p as Record<string, unknown>;
+  return (
+    typeof o.publicKey === "string" && o.publicKey.length > 0 &&
+    typeof o.etherAddress === "string" && o.etherAddress.length > 0 &&
+    typeof o.username === "string" && o.username.length > 0 &&
+    typeof o.level === "number" &&
+    typeof o.skinIndex === "number" &&
+    typeof o.rank === "string" && o.rank.length > 0
+  );
+}
+
 function loadSession(): PlayerData | null {
   // Try new session format
   const raw = localStorage.getItem("session");
   if (raw) {
     try {
       const session = JSON.parse(raw) as SessionData;
-      // Check expiration
       if (Date.now() - session.loginAt > SESSION_TTL_MS) {
         localStorage.removeItem("session");
         return null;
       }
-      if (session.player?.publicKey && session.player?.username) {
+      if (isValidPlayer(session.player)) {
         return session.player;
       }
     } catch { /* corrupt */ }
@@ -90,8 +102,8 @@ function loadSession(): PlayerData | null {
   if (old) {
     try {
       const p = JSON.parse(old) as PlayerData;
-      if (p.publicKey && p.username) {
-        saveSession(p); // migrate
+      if (isValidPlayer(p)) {
+        saveSession(p);
         return p;
       }
     } catch { /* corrupt */ }
@@ -126,8 +138,12 @@ export default function Home() {
     fetch(`/api/players/check?pk=${encodeURIComponent(p.publicKey)}`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.registered && data.player?.username) {
-          // Server confirmed — log in
+        if (
+          data.registered &&
+          data.player?.publicKey &&
+          data.player?.etherAddress &&
+          data.player?.username
+        ) {
           const confirmed: PlayerData = {
             publicKey: data.player.publicKey,
             etherAddress: data.player.etherAddress,
@@ -138,10 +154,9 @@ export default function Home() {
           };
           setPlayer(confirmed);
           setWalletAddress(data.player.walletAddress ?? "");
-          saveSession(confirmed); // refresh session timestamp
+          saveSession(confirmed);
           setView("profile");
         } else {
-          // Server says not registered — session is stale
           clearSession();
           setView("welcome");
         }
@@ -206,7 +221,12 @@ export default function Home() {
     const res = await fetch(`/api/players/check?pk=${encodeURIComponent(data.publicKey)}`);
     const check = await res.json();
 
-    if (check.registered && check.player.username) {
+    if (
+      check.registered &&
+      check.player?.publicKey &&
+      check.player?.etherAddress &&
+      check.player?.username
+    ) {
       const p: PlayerData = {
         publicKey: check.player.publicKey,
         etherAddress: check.player.etherAddress,
@@ -219,7 +239,7 @@ export default function Home() {
       setWalletAddress(check.player.walletAddress ?? "");
       saveSession(p);
       setView("profile");
-    } else if (check.registered && !check.player.username) {
+    } else if (check.registered && !check.player?.username) {
       setScanData(data);
       setView("username");
     } else {
