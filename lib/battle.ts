@@ -95,11 +95,21 @@ export async function createBattle(
   wagerAmount?: string,
 ): Promise<Battle | { error: string }> {
   // Try local JSON first, fall back to ENS
-  const attacker = getProfile(attackerPk) || await getProfileFromEns(attackerPk);
-  const defender = getProfile(defenderPk) || await getProfileFromEns(defenderPk);
+  let attacker = getProfile(attackerPk);
+  if (!attacker?.username) {
+    console.log(`[Battle] Attacker ${attackerPk.slice(0,10)}... not in JSON, trying ENS...`);
+    attacker = await getProfileFromEns(attackerPk);
+    console.log(`[Battle] ENS result for attacker:`, attacker ? `found ${attacker.username}` : "null");
+  }
+  let defender = getProfile(defenderPk);
+  if (!defender?.username) {
+    console.log(`[Battle] Defender ${defenderPk.slice(0,10)}... not in JSON, trying ENS...`);
+    defender = await getProfileFromEns(defenderPk);
+    console.log(`[Battle] ENS result for defender:`, defender ? `found ${defender.username}` : "null");
+  }
 
-  if (!attacker || !attacker.username) return { error: "Attacker not found" };
-  if (!defender || !defender.username) return { error: "Opponent not found" };
+  if (!attacker || !attacker.username) return { error: `Attacker not found (pk: ${attackerPk.slice(0,10)}...)` };
+  if (!defender || !defender.username) return { error: `Opponent not found (pk: ${defenderPk.slice(0,10)}...)` };
   if (attackerPk.toLowerCase() === defenderPk.toLowerCase()) return { error: "Cannot battle yourself" };
 
   if (mode === "wager") {

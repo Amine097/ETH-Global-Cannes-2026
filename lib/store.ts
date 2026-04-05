@@ -225,12 +225,22 @@ async function resolveUsername(publicKey: string): Promise<string | null> {
   const pk = publicKey.toLowerCase();
   // Try local JSON
   const players = loadPlayers();
-  if (players[pk]?.username) return players[pk].username;
+  if (players[pk]?.username) {
+    console.log(`[resolveUsername] Found ${players[pk].username} in JSON for ${pk.slice(0,10)}...`);
+    return players[pk].username;
+  }
   // Try ENS player index
   try {
+    console.log(`[resolveUsername] JSON miss for ${pk.slice(0,10)}..., reading ENS player index...`);
     const index = await readPlayerIndex();
-    if (index && index[pk]) return index[pk];
-  } catch { /* ignore */ }
+    if (index && index[pk]) {
+      console.log(`[resolveUsername] Found ${index[pk]} in ENS index`);
+      return index[pk];
+    }
+    console.log(`[resolveUsername] Not found in ENS index either. Index keys:`, index ? Object.keys(index).map(k => k.slice(0,10)) : "null");
+  } catch (err) {
+    console.error(`[resolveUsername] ENS index read failed:`, err);
+  }
   return null;
 }
 
