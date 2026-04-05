@@ -12,6 +12,9 @@ import { BattleArena } from "@/components/BattleArena";
 import { WalletConnect } from "@/components/WalletConnect";
 import { WithDynamic } from "@/components/WithDynamic";
 
+// Session expires after 4 hours
+const SESSION_TTL_MS = 4 * 60 * 60 * 1000;
+
 type View =
   | "loading"
   | "welcome"
@@ -28,6 +31,11 @@ interface PlayerData {
   publicKey: string;
   etherAddress: string;
   username: string;
+}
+
+interface SessionData {
+  player: PlayerData;
+  loginAt: number;
 }
 
 interface ScanData {
@@ -47,6 +55,54 @@ interface PendingBattle {
   wagerAmount?: string;
 }
 
+// ── Session helpers ──
+
+function saveSession(player: PlayerData) {
+  const session: SessionData = { player, loginAt: Date.now() };
+  localStorage.setItem("session", JSON.stringify(session));
+  // Clean old key
+  localStorage.removeItem("player");
+}
+
+function loadSession(): PlayerData | null {
+  // Try new session format
+  const raw = localStorage.getItem("session");
+  if (raw) {
+    try {
+      const session = JSON.parse(raw) as SessionData;
+      // Check expiration
+      if (Date.now() - session.loginAt > SESSION_TTL_MS) {
+        localStorage.removeItem("session");
+        return null;
+      }
+      if (session.player?.publicKey && session.player?.username) {
+        return session.player;
+      }
+    } catch { /* corrupt */ }
+    localStorage.removeItem("session");
+  }
+  // Migrate old format
+  const old = localStorage.getItem("player");
+  if (old) {
+    try {
+      const p = JSON.parse(old) as PlayerData;
+      if (p.publicKey && p.username) {
+        saveSession(p); // migrate
+        return p;
+      }
+    } catch { /* corrupt */ }
+    localStorage.removeItem("player");
+  }
+  return null;
+}
+
+function clearSession() {
+  localStorage.removeItem("session");
+  localStorage.removeItem("player");
+  localStorage.removeItem("world_verified");
+  localStorage.removeItem("pending_verify");
+}
+
 export default function Home() {
   const [view, setView] = useState<View>("loading");
   const [player, setPlayer] = useState<PlayerData | null>(null);
@@ -56,42 +112,40 @@ export default function Home() {
   const [activeBattleId, setActiveBattleId] = useState<string | null>(null);
   const pollingRef = useRef(false);
 
+  // ── Init: load session + verify with server ──
   useEffect(() => {
-    const saved = localStorage.getItem("player");
-    // const worldVerified = localStorage.getItem("world_verified") === "true";
-
-    if (saved) {
-      try {
-        const p = JSON.parse(saved) as PlayerData;
-        // World ID check disabled for now — skip verify step
-        // if (p.publicKey && p.username && worldVerified) {
-        if (p.publicKey && p.username) {
-          setPlayer(p);
-          // Fetch wallet address
-          fetch(`/api/players/check?pk=${encodeURIComponent(p.publicKey)}`)
-            .then(r => r.json())
-            .then(d => { if (d.player?.walletAddress) setWalletAddress(d.player.walletAddress); })
-            .catch(() => {});
-          setView("profile");
-          return;
-        }
-        // World ID re-verify disabled for now
-        // if (p.publicKey && p.username && !worldVerified) {
-        //   setPlayer(p);
-        //   setView("verify");
-        //   return;
-        // }
-      } catch { /* ignore */ }
+    const p = loadSession();
+    if (!p) {
+      setView("welcome");
+      return;
     }
 
-    // World ID redirect check disabled for now
-    // const pending = localStorage.getItem("pending_verify");
-    // if (pending === "true") {
-    //   setView("verify");
-    //   return;
-    // }
-
-    setView("welcome");
+    // Verify the player still exists on the server (ENS-backed)
+    fetch(`/api/players/check?pk=${encodeURIComponent(p.publicKey)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.registered && data.player?.username) {
+          // Server confirmed — log in
+          const confirmed: PlayerData = {
+            publicKey: data.player.publicKey,
+            etherAddress: data.player.etherAddress,
+            username: data.player.username,
+          };
+          setPlayer(confirmed);
+          setWalletAddress(data.player.walletAddress ?? "");
+          saveSession(confirmed); // refresh session timestamp
+          setView("profile");
+        } else {
+          // Server says not registered — session is stale
+          clearSession();
+          setView("welcome");
+        }
+      })
+      .catch(() => {
+        // Network error — trust local session as fallback
+        setPlayer(p);
+        setView("profile");
+      });
   }, []);
 
   // ── Poll for incoming battle invites while on profile ──
@@ -149,23 +203,15 @@ export default function Home() {
   function handleVerified() {
     localStorage.setItem("world_verified", "true");
     localStorage.removeItem("pending_verify");
-
-    // If player already exists (re-verify flow), go straight to profile
-    if (player) {
-      setView("profile");
-      return;
-    }
-
+    if (player) { setView("profile"); return; }
     setView("scan");
   }
 
   async function handleScan(data: ScanData) {
-    // Check if this bracelet is already bound to an account
     const res = await fetch(`/api/players/check?pk=${encodeURIComponent(data.publicKey)}`);
     const check = await res.json();
 
     if (check.registered && check.player.username) {
-      // Already bound → log them in directly
       const p: PlayerData = {
         publicKey: check.player.publicKey,
         etherAddress: check.player.etherAddress,
@@ -173,22 +219,18 @@ export default function Home() {
       };
       setPlayer(p);
       setWalletAddress(check.player.walletAddress ?? "");
-      localStorage.setItem("player", JSON.stringify(p));
+      saveSession(p);
       setView("profile");
     } else if (check.registered && !check.player.username) {
-      // Registered but no username yet → go to username chooser
       setScanData(data);
       setView("username");
     } else {
-      // New bracelet → go to username chooser
       setScanData(data);
       setView("username");
     }
   }
 
-  function handleConnectWallet() {
-    setView("wallet-connect");
-  }
+  function handleConnectWallet() { setView("wallet-connect"); }
 
   function handleWalletConnected(address: string) {
     setWalletAddress(address);
@@ -196,11 +238,10 @@ export default function Home() {
   }
 
   function handleLogout() {
-    localStorage.removeItem("player");
-    localStorage.removeItem("world_verified");
-    localStorage.removeItem("pending_verify");
+    clearSession();
     pollingRef.current = false;
     setPlayer(null);
+    setWalletAddress("");
     setView("welcome");
   }
 
@@ -233,8 +274,8 @@ export default function Home() {
 
   if (view === "loading") {
     return (
-      <main className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#888] border-t-white" />
+      <main className="realm-bg flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 spinner-gold" />
       </main>
     );
   }
@@ -247,10 +288,7 @@ export default function Home() {
     return (
       <WorldVerify
         onVerified={handleVerified}
-        onBack={() => {
-          localStorage.removeItem("pending_verify");
-          setView("welcome");
-        }}
+        onBack={() => { localStorage.removeItem("pending_verify"); setView("welcome"); }}
       />
     );
   }
@@ -273,7 +311,7 @@ export default function Home() {
             username,
           };
           setPlayer(p);
-          localStorage.setItem("player", JSON.stringify(p));
+          saveSession(p);
           setView("profile");
         }}
       />
@@ -314,10 +352,7 @@ export default function Home() {
           battleId={activeBattleId}
           playerPk={player.publicKey}
           role="defender"
-          onDone={() => {
-            setActiveBattleId(null);
-            setView("profile");
-          }}
+          onDone={() => { setActiveBattleId(null); setView("profile"); }}
         />
       </WithDynamic>
     );
@@ -348,5 +383,6 @@ export default function Home() {
     );
   }
 
-  return null;
+  // Fallback — should never happen, but safety net
+  return <Welcome onEnter={() => startAuth()} />;
 }

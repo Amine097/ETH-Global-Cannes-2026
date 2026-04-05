@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isRegistered, getProfileFromEns } from "@/lib/store";
+import { isRegistered, getProfileFromEns, getProfile, saveBinding } from "@/lib/store";
 
 export async function GET(req: NextRequest) {
   const pk = req.nextUrl.searchParams.get("pk");
@@ -15,6 +15,17 @@ export async function GET(req: NextRequest) {
 
   // Read full profile from ENS (falls back to JSON)
   const profile = await getProfileFromEns(pk);
+
+  // ── Hydrate local cache so future requests (battle, etc.) find the player instantly ──
+  if (profile && profile.username && !getProfile(pk)) {
+    saveBinding({
+      playerId: profile.publicKey,
+      publicKey: profile.publicKey,
+      etherAddress: profile.etherAddress,
+      username: profile.username,
+      linkedAt: new Date(profile.linkedAt || Date.now()),
+    });
+  }
 
   return NextResponse.json({
     registered: true,

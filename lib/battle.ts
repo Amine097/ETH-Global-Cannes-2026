@@ -1,5 +1,6 @@
 import crypto from "crypto";
-import { getProfile, getProfileFromEns, updateProfile } from "./store";
+import { getProfile, getProfileFromEns, updateProfile, saveBinding } from "./store";
+import type { PlayerProfile } from "./store";
 
 // ── Types ──
 
@@ -94,22 +95,30 @@ export async function createBattle(
   mode: BattleMode = "free",
   wagerAmount?: string,
 ): Promise<Battle | { error: string }> {
-  // Try local JSON first, fall back to ENS
-  let attacker = getProfile(attackerPk);
-  if (!attacker?.username) {
-    console.log(`[Battle] Attacker ${attackerPk.slice(0,10)}... not in JSON, trying ENS...`);
-    attacker = await getProfileFromEns(attackerPk);
-    console.log(`[Battle] ENS result for attacker:`, attacker ? `found ${attacker.username}` : "null");
-  }
-  let defender = getProfile(defenderPk);
-  if (!defender?.username) {
-    console.log(`[Battle] Defender ${defenderPk.slice(0,10)}... not in JSON, trying ENS...`);
-    defender = await getProfileFromEns(defenderPk);
-    console.log(`[Battle] ENS result for defender:`, defender ? `found ${defender.username}` : "null");
+  // Helper: get profile from cache or ENS, hydrate cache if found on ENS
+  async function loadPlayer(pk: string): Promise<PlayerProfile | null> {
+    let p = getProfile(pk);
+    if (p?.username) return p;
+    // Not in cache — fetch from ENS
+    p = await getProfileFromEns(pk);
+    if (p?.username) {
+      // Hydrate local cache for future requests
+      saveBinding({
+        playerId: p.publicKey,
+        publicKey: p.publicKey,
+        etherAddress: p.etherAddress,
+        username: p.username,
+        linkedAt: new Date(p.linkedAt || Date.now()),
+      });
+    }
+    return p;
   }
 
-  if (!attacker || !attacker.username) return { error: `Attacker not found (pk: ${attackerPk.slice(0,10)}...)` };
-  if (!defender || !defender.username) return { error: `Opponent not found (pk: ${defenderPk.slice(0,10)}...)` };
+  const attacker = await loadPlayer(attackerPk);
+  const defender = await loadPlayer(defenderPk);
+
+  if (!attacker || !attacker.username) return { error: "Attacker not found" };
+  if (!defender || !defender.username) return { error: "Opponent not found" };
   if (attackerPk.toLowerCase() === defenderPk.toLowerCase()) return { error: "Cannot battle yourself" };
 
   if (mode === "wager") {
